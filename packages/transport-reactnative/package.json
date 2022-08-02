@@ -1,6 +1,6 @@
 {
   "name": "@secux/transport-reactnative",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "SecuX Hardware Wallet react native API for communication layer",
   "keywords": [
     "secux",
@@ -29,7 +29,8 @@
     "watch": "tsc --watch"
   },
   "dependencies": {
-    "@secux/transport": "^3.3.0",
+    "@secux/protocol-device": "^3.0.3",
+    "@secux/transport": "^3.3.1",
     "buffer": "^6.0.3",
     "process": "^0.11.10"
   },

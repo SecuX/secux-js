@@ -175,6 +175,18 @@ export function loadPlugin(plugin: Function, name: string) {
     }
 }
 
+export function checkFWVersion(type: string, restrict: string, current: string) {
+    if (!restrict || !current) return;
+
+    const r = restrict.split('.').map(x => parseInt(x));
+    const c = current.split('.').map(x => parseInt(x));
+
+    for (let i = 0; i < restrict.length; i++) {
+        const _r = r[i], _c = c[i];
+        if (_r < _c) return;
+        if (_r > _c) throw Error(`${type} firmware need update, version "${restrict}" needed, but got "${current}"`);
+    }
+}
 
 function numbersToRegExp(list: Array<number>): string {
     let a = "";

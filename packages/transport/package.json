@@ -1,6 +1,6 @@
 {
   "name": "@secux/transport",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "SecuX Hardware Wallet transport API for communication layer",
   "keywords": [
     "secux",

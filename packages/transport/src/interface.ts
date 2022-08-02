@@ -57,3 +57,8 @@ export const ProtocolV2 = Object.freeze({
     SERIAL_END: 0x7f,
     USB_BUFFER_LEN: 64
 });
+
+export enum DeviceType {
+    crypto = "crypto",
+    nifty = "nifty"
+}

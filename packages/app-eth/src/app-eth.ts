@@ -20,10 +20,10 @@ limitations under the License.
 import { keccak256 } from "js-sha3";
 const secp256k1 = require('secp256k1/elliptic');
 import ow from 'ow';
-import { loadPlugin, Logger, owTool, ow_strictPath } from '@secux/utility';
+import { checkFWVersion, loadPlugin, Logger, owTool, ow_strictPath } from '@secux/utility';
 import { SecuxTransactionTool } from "@secux/protocol-transaction";
 import { EllipticCurve, TransactionType } from "@secux/protocol-transaction/lib/interface";
-import { ow_address, ow_tx155, ow_tx1559, ow_EIP712TypedData, tx155, tx1559, ow_TypedMessage, JsonString, isJsonString } from './interface';
+import { ow_tx155, ow_tx1559, tx155, tx1559, JsonString, isJsonString } from './interface';
 import { ETHTransactionBuilder, getBuilder } from './transaction';
 import { TypedDataUtils } from "eth-sig-util";
 import { base64_regexp, communicationData, getBuffer, ow_communicationData, toCommunicationData, wrapResult } from "@secux/utility/lib/communication";
@@ -34,6 +34,10 @@ import { IPlugin, ITransport, staticImplements } from "@secux/transport";
 export { SecuxETH, tx155, tx1559 };
 const logger = Logger?.child({ id: "ethereum" });
 const ow_path = ow_strictPath(60, 44);
+const mcu = {
+    crypto: "2.12",
+    nifty: "0.02.1"
+};
 
 
 /**
@@ -140,9 +144,9 @@ class SecuxETH {
         const buf = getBuffer(serialized);
         logger?.debug(`- prepareSignSerialized\ninput serialized tx: ${buf.toString("hex")}`);
         const builder = ETHTransactionBuilder.deserialize(buf);
-        ow(builder.tx.to, ow_address);
+        const isBlindSign = builder.tx.data?.length > 0;
 
-        return prepareSign(path, builder, false).commandData;
+        return prepareSign(path, builder, isBlindSign).commandData;
     }
 
     /**
@@ -234,6 +238,7 @@ class SecuxETH {
      * @returns {communicationData} data for sending to device
      */
     static prepareSignMessage(path: string, message: string | Buffer): communicationData {
+        checkFWVersion("mcu", mcu[ITransport.deviceType], ITransport.mcuVersion);
         ow(path, ow_path);
         ow(message, ow.any(ow.string.nonEmpty, ow.buffer));
 
@@ -257,6 +262,7 @@ class SecuxETH {
      * @returns {communicationData} data for sending to device
      */
     static prepareSignTypedData(path: string, typedData: JsonString): communicationData {
+        checkFWVersion("mcu", mcu[ITransport.deviceType], ITransport.mcuVersion);
         ow(path, ow_path);
         ow(typedData, ow.string);
         const data = JSON.parse(typedData);
@@ -413,6 +419,7 @@ function toChecksumAddress(address: string) {
 }
 
 export function prepareSign(path: string, builder: ETHTransactionBuilder, isBlind: boolean, tp?: TransactionType): { commandData: communicationData, rawTx: communicationData } {
+    checkFWVersion("mcu", mcu[ITransport.deviceType], ITransport.mcuVersion);
     ow(path, ow_path);
 
     if (tp === undefined) {
@@ -426,8 +433,11 @@ export function prepareSign(path: string, builder: ETHTransactionBuilder, isBlin
     const option = {
         tp,
         curve: EllipticCurve.SECP256K1,
-        chainId: builder.tx.chainId ?? 1
+        chainId: builder.chainId ?? 1
     };
+    // firmware restriction: uint16LE
+    if (option.chainId > 65535) { option.chainId = 65535; }
+
     const buf = (!isBlind)
         ? SecuxTransactionTool.signRawTransaction(path, builder.serialize(), option)
         : SecuxTransactionTool.signTransaction(path, builder.serialize(true), option);
@@ -460,7 +470,7 @@ function validatePublickey(data: string | Buffer) {
 /**
  * The payment object for EIP-155.
  * @typedef {object} tx155 
- * @property {number} chainId network for ethereum ecosystem
+ * @property {number | string} chainId network for ethereum ecosystem
  * @property {string} to receiving address
  * @property {number | string} value sending amount
  * @property {number | string} nonce the number of transactions sent from this address
@@ -472,7 +482,7 @@ function validatePublickey(data: string | Buffer) {
 /**
  * The payment object for EIP-1559.
  * @typedef {object} tx1559 
- * @property {number} chainId network for ethereum ecosystem
+ * @property {number | string} chainId network for ethereum ecosystem
  * @property {string} to receiving address
  * @property {number | string} value sending amount
  * @property {number | string} nonce the number of transactions sent from this address

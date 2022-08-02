@@ -18,8 +18,10 @@ limitations under the License.
 
 
 import { ITransport } from "@secux/transport";
-import { StatusCode, TransportStatusError } from "@secux/utility/lib/communication";
-import { DeviceType, Devices } from "./interface";
+import { DeviceType } from "@secux/transport/lib/interface";
+import { getBuffer, StatusCode, TransportStatusError } from "@secux/utility/lib/communication";
+import { SecuxDevice } from "@secux/protocol-device";
+import { Devices } from "./interface";
 export { SecuxWebBLE };
 
 
@@ -31,6 +33,8 @@ const callback = () => { };
  */
 class SecuxWebBLE extends ITransport {
     #device: BluetoothDevice;
+    #mcuVersion: string = '';
+    #seVersion: string = '';
     #reader?: BluetoothRemoteGATTCharacteristic;
     #writer?: BluetoothRemoteGATTCharacteristic;
     #type?: DeviceType;
@@ -97,6 +101,11 @@ class SecuxWebBLE extends ITransport {
 
         await this.#reader.startNotifications();
         this.#reader.addEventListener(ValueChangedId, handleNotifications);
+
+        ITransport.deviceType = this.#type;
+        if (this.#type === DeviceType.nifty) {
+            await this.#setFirwmareVersion();
+        }
     }
 
     /**
@@ -114,7 +123,7 @@ class SecuxWebBLE extends ITransport {
      */
     async Write(data: Buffer) {
         await this.#writer!.writeValueWithoutResponse(data);
-        
+
         // send too fast will fail to update SE
         await new Promise(resolve => setTimeout(resolve, 1));
     }
@@ -132,11 +141,15 @@ class SecuxWebBLE extends ITransport {
             throw new TransportStatusError(status);
         }
 
+        await this.#setFirwmareVersion();
+
         return true;
     }
 
     get DeviceName() { return this.#device.name; }
-    get DeviceType() { return this.#type; }
+    get DeviceType() { return this.#type ?? ''; }
+    get MCU() { return this.#mcuVersion; }
+    get SE() { return this.#seVersion; }
 
 
     #identify(services: Array<BluetoothRemoteGATTService>) {
@@ -148,5 +161,16 @@ class SecuxWebBLE extends ITransport {
         }
 
         throw Error("Cannot find related GATTService");
+    }
+
+    async #setFirwmareVersion() {
+        const data = SecuxDevice.prepareGetVersion();
+        const rsp = await this.Exchange(getBuffer(data));
+        const { mcuFwVersion, seFwVersion } = SecuxDevice.resolveVersion(rsp);
+        this.#mcuVersion = mcuFwVersion;
+        this.#seVersion = seFwVersion;
+
+        ITransport.mcuVersion = mcuFwVersion;
+        ITransport.seVersion = seFwVersion;
     }
 }

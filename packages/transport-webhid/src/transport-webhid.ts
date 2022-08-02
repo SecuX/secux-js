@@ -18,7 +18,9 @@ limitations under the License.
 
 
 import { ITransport } from "@secux/transport";
-import { ProtocolV2 } from "@secux/transport/lib/interface";
+import { DeviceType, ProtocolV2 } from "@secux/transport/lib/interface";
+import { SecuxDevice } from "@secux/protocol-device";
+import { getBuffer } from "@secux/utility/lib/communication";
 export { SecuxWebHID };
 
 
@@ -37,6 +39,8 @@ const callback = () => { };
  */
 class SecuxWebHID extends ITransport {
     #device: HIDDevice;
+    #mcuVersion: string = '';
+    #seVersion: string = '';
     #OnConnected: Function;
     #OnDisconnected: Function;
 
@@ -79,6 +83,16 @@ class SecuxWebHID extends ITransport {
 
             this.#OnConnected();
             this.#DisconnectWatcher();
+
+            const data = SecuxDevice.prepareGetVersion();
+            const rsp = await this.Exchange(getBuffer(data));
+            const { mcuFwVersion, seFwVersion } = SecuxDevice.resolveVersion(rsp);
+            this.#mcuVersion = mcuFwVersion;
+            this.#seVersion = seFwVersion;
+
+            ITransport.deviceType = DeviceType.nifty;
+            ITransport.mcuVersion = mcuFwVersion;
+            ITransport.seVersion = seFwVersion;
         } catch (e) {
             throw e;
         }
@@ -116,6 +130,9 @@ class SecuxWebHID extends ITransport {
     }
 
     get DeviceName() { return this.#device.productName; }
+    get DeviceType() { return DeviceType.nifty; }
+    get MCU() { return this.#mcuVersion; }
+    get SE() { return this.#seVersion; }
 
 
     #DisconnectWatcher() {

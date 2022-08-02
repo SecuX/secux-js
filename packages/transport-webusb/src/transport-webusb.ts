@@ -18,6 +18,9 @@ limitations under the License.
 
 
 import { ITransport } from "@secux/transport";
+import { DeviceType } from "@secux/transport/lib/interface";
+import { getBuffer } from "@secux/utility/lib/communication";
+import { SecuxDevice } from "@secux/protocol-device";
 export { SecuxWebUSB };
 
 
@@ -39,6 +42,8 @@ const callback = () => { };
 class SecuxWebUSB extends ITransport {
     #device: USBDevice;
     #connected: boolean = false;
+    #mcuVersion: string = '';
+    #seVersion: string = '';
     #OnConnected: Function;
     #OnDisconnected: Function;
 
@@ -82,6 +87,16 @@ class SecuxWebUSB extends ITransport {
             this.#connected = true;
             this.#DisconnectWatcher();
             this.#Listener();
+
+            const data = SecuxDevice.prepareGetVersion();
+            const rsp = await this.Exchange(getBuffer(data));
+            const { mcuFwVersion, seFwVersion } = SecuxDevice.resolveVersion(rsp);
+            this.#mcuVersion = mcuFwVersion;
+            this.#seVersion = seFwVersion;
+
+            ITransport.deviceType = DeviceType.crypto;
+            ITransport.mcuVersion = mcuFwVersion;
+            ITransport.seVersion = seFwVersion;
         } catch (e) {
             throw e;
         }
@@ -138,6 +153,9 @@ class SecuxWebUSB extends ITransport {
     }
 
     get DeviceName() { return this.#device.productName; }
+    get DeviceType() { return DeviceType.crypto; }
+    get MCU() { return this.#mcuVersion; }
+    get SE() { return this.#seVersion; }
 
     async #Read(): Promise<Buffer> {
         const receive = await this.#device.transferIn(ENDPOINT_ID, PACKET);

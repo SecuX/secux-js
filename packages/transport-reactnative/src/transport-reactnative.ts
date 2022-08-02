@@ -21,8 +21,10 @@ require("./shim.js");
 const { Platform } = require("react-native");
 import { Device, BleError, Characteristic, BleManager, State, ScanCallbackType, ScanMode, Service } from "react-native-ble-plx";
 import { ITransport } from "@secux/transport";
-import { StatusCode, TransportStatusError } from "@secux/utility/lib/communication";
-import { Devices, DeviceType } from "./interface";
+import { DeviceType } from "@secux/transport/lib/interface";
+import { getBuffer, StatusCode, TransportStatusError } from "@secux/utility/lib/communication";
+import { SecuxDevice } from "@secux/protocol-device";
+import { Devices } from "./interface";
 export { SecuxReactNativeBLE, DeviceCallback };
 
 
@@ -37,6 +39,8 @@ class SecuxReactNativeBLE extends ITransport {
     static #scanning: boolean;
 
     #device: Device;
+    #mcuVersion: string = '';
+    #seVersion: string = '';
     #type?: DeviceType;
     #reader?: Characteristic;
     #writer?: Characteristic;
@@ -119,6 +123,9 @@ class SecuxReactNativeBLE extends ITransport {
                 this.ReceiveData(buf);
             }
         });
+
+        ITransport.deviceType = uuid.TYPE;
+        await this.#setFirmwareVersion();
     }
 
     /**
@@ -155,7 +162,9 @@ class SecuxReactNativeBLE extends ITransport {
     }
 
     get DeviceName() { return this.#device.name; }
-    get DeviceType() { return this.#type; }
+    get DeviceType() { return this.#type ?? ''; }
+    get MCU() { return this.#mcuVersion; }
+    get SE() { return this.#seVersion; }
 
     /**
      * Start to scan SecuX devices for pairing, remember to call StopScan()
@@ -227,6 +236,17 @@ class SecuxReactNativeBLE extends ITransport {
         if (!this.#bleManager) this.#bleManager = new BleManager();
 
         return this.#bleManager;
+    }
+
+    async #setFirmwareVersion() {
+        const data = SecuxDevice.prepareGetVersion();
+        const rsp = await this.Exchange(getBuffer(data));
+        const { mcuFwVersion, seFwVersion } = SecuxDevice.resolveVersion(rsp);
+        this.#mcuVersion = mcuFwVersion;
+        this.#seVersion = seFwVersion;
+
+        ITransport.mcuVersion = mcuFwVersion;
+        ITransport.seVersion = seFwVersion;
     }
 }
 

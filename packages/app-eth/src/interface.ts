@@ -37,7 +37,7 @@ export const ow_gasPriceUnit = ow.any(ow.number.uint32.greaterThanOrEqual(1e9), 
 
 
 export interface tx155_base {
-    chainId: number,
+    chainId: number | PrefixedHexString,
     nonce: number | PrefixedHexString,
     gasPrice: number | PrefixedHexString,
     gasLimit: number | PrefixedHexString,
@@ -46,7 +46,7 @@ export interface tx155_base {
 }
 
 export interface tx1559_base {
-    chainId: number,
+    chainId: number | PrefixedHexString,
     nonce: number | PrefixedHexString,
     maxPriorityFeePerGas: number | PrefixedHexString,
     maxFeePerGas: number | PrefixedHexString,
@@ -67,7 +67,7 @@ export interface tx1559 extends tx1559_base {
 export type baseData = tx155_base | tx1559_base;
 
 const __tx155 = {
-    chainId: ow.number.positive,
+    chainId: ow.any(ow.number.positive, owTool.prefixedhexString),
     nonce: ow.any(ow.number, owTool.prefixedhexString),
     gasPrice: ow_gasPriceUnit,
     gasLimit: ow.any(ow.number.positive, owTool.prefixedhexString),
@@ -81,7 +81,7 @@ export const ow_tx155 = ow.object.exactShape({
 });
 
 const __tx1559 = {
-    chainId: ow.number.positive,
+    chainId: ow.any(ow.number.positive, owTool.prefixedhexString),
     nonce: ow.any(ow.number, owTool.prefixedhexString),
     maxPriorityFeePerGas: ow.any(ow.number.uint32.positive, owTool.prefixedhexString),
     maxFeePerGas: ow_gasPriceUnit,

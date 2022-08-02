@@ -1,6 +1,6 @@
 {
   "name": "@secux/transport-webhid",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "SecuX Hardware Wallet webHID API for communication layer",
   "keywords": [
     "secux",
@@ -29,7 +29,8 @@
     "watch": "tsc --watch"
   },
   "dependencies": {
-    "@secux/transport": "^3.3.0"
+    "@secux/protocol-device": "^3.0.3",
+    "@secux/transport": "^3.3.1"
   },
   "devDependencies": {
     "@types/w3c-web-hid": "^1.0.2"

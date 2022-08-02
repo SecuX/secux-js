@@ -1,6 +1,6 @@
 {
   "name": "@secux/transport-webusb",
-  "version": "3.1.4",
+  "version": "3.1.5",
   "description": "SecuX Hardware Wallet webUSB/USB API for communication layer",
   "keywords": [
     "secux",
@@ -30,7 +30,8 @@
     "watch": "tsc --watch"
   },
   "dependencies": {
-    "@secux/transport": "^3.3.0"
+    "@secux/protocol-device": "^3.0.3",
+    "@secux/transport": "^3.3.1"
   },
   "devDependencies": {
     "@types/w3c-web-usb": "^1.0.5"

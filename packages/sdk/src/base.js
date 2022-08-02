@@ -51,6 +51,12 @@ Object.defineProperty(global, "@secux/protocol-transaction", {
     value: Object.freeze(require("@secux/protocol-transaction"))
 });
 
+if (!global["@secux/transport"]) {
+    global["@secux/transport"] = {
+        ITransport: {}
+    };
+}
+
 
 export { isSupportedCoin, toExtenededPublicKey, Signature } from "@secux/utility";
 export { to_L1_APDU } from "@secux/utility/lib/communication";

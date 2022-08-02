@@ -18,12 +18,8 @@ limitations under the License.
 
 
 import { ITransport } from "@secux/transport";
+import { DeviceType } from "@secux/transport/lib/interface";
 
-
-export enum DeviceType {
-    crypto = "crypto",
-    nifty = "nifty"
-}
 
 export const Devices = [
     {

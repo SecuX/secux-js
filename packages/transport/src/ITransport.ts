@@ -17,7 +17,7 @@ limitations under the License.
 */
 
 
-import { IAPDUResponse, ProtocolV2, TransportConfig } from "./interface";
+import { DeviceType, IAPDUResponse, ProtocolV2, TransportConfig } from "./interface";
 import { APDUResolver, BaseResolver, BaseResolverV2, CommandResolver, IResolver, NotifyResolver } from "./resolver";
 import { owTool, supported_coin } from "@secux/utility";
 import { communicationData, getBuffer, Send, to_L1_APDU } from "@secux/utility/lib/communication";
@@ -35,8 +35,15 @@ const NotImplemented = Error("abstract method need to be implemented.");
 abstract class ITransport {
     static readonly PROTOCOLv1 = 1;
     static readonly PROTOCOLv2 = 2;
+
+    // cache device info
+    static deviceType: DeviceType;
+    static mcuVersion: string;
+    static seVersion: string;
+
     OnNotification?: (data: Buffer) => void;
     autoApplyL1: boolean = true;
+
 
     /**
      * @constructor
@@ -129,6 +136,10 @@ abstract class ITransport {
 
         this.#packetSize = value;
     }
+
+    get DeviceType() { return ''; }
+    get MCU() { return ''; }
+    get SE() { return ''; }
 
 
     #version?: number;

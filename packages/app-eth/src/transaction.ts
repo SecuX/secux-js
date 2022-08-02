@@ -51,8 +51,9 @@ class ETHTransactionBuilder {
             }
 
             const [nonce, gasPrice, gasLimit, to, value, data, v, r, s] = values;
+            const _v = parseInt(Buffer.from(v).toString("hex"), 16);
             let chainId = undefined;
-            if (v !== 0 && v !== 27 && v !== 28) chainId = v;
+            if (![0, 27, 28].includes(_v)) chainId = v;
 
             return new ETHTransactionBuilder({
                 nonce,
@@ -91,10 +92,15 @@ class ETHTransactionBuilder {
     }
 
     constructor(tx: any) {
-        this.#tx = tx;
+        this.#tx = { ...tx };
 
         if (typeof tx.chainId === "string") {
-            this.#tx.chainId = parseInt(tx.chainId.slice(2), 16);
+            this.#tx.chainId = Buffer.from(tx.chainId.slice(2), "hex");
+        }
+        else if (typeof tx.chainId === "number") {
+            let str = tx.chainId.toString(16);
+            if (str.length % 2 !== 0) str = `0${str}`;
+            this.#tx.chainId = Buffer.from(str, "hex");
         }
 
         if (tx.gasPrice) {
@@ -201,6 +207,12 @@ class ETHTransactionBuilder {
         }
 
         return true;
+    }
+
+    get chainId() {
+        if (!this.#tx.chainId) return undefined;
+
+        return parseInt(Buffer.from(this.#tx.chainId).toString("hex"), 16);
     }
 
     get tx() { return this.#tx; }
