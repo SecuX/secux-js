@@ -433,7 +433,8 @@ export function prepareSign(path: string, builder: ETHTransactionBuilder, isBlin
     const option = {
         tp,
         curve: EllipticCurve.SECP256K1,
-        chainId: builder.chainId ?? 1
+        // must consider NaN value
+        chainId: builder.chainId || 1
     };
     // firmware restriction: uint16LE
     if (option.chainId > 65535) { option.chainId = 65535; }

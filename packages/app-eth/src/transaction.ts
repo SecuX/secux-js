@@ -70,8 +70,8 @@ class ETHTransactionBuilder {
         if (serialized[0] <= 0x7f) {
             const values = rlp.decode(serialized.slice(1));
             if (!Array.isArray(values)) throw new Error('Invalid serialized tx input. Must be array');
-            if (values.length !== 9) {
-                throw new Error('Invalid transaction. Only expecting unsigned tx with 9 values (EIP1559).');
+            if (values.length !== 9 && values.length !== 12) {
+                throw new Error('Invalid transaction. Only expecting unsigned tx with 9 or 12 values (EIP1559).');
             }
 
             const [chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data] = values;
