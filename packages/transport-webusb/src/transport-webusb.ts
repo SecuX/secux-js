@@ -88,15 +88,18 @@ class SecuxWebUSB extends ITransport {
             this.#DisconnectWatcher();
             this.#Listener();
 
-            const data = SecuxDevice.prepareGetVersion();
-            const rsp = await this.Exchange(getBuffer(data));
-            const { mcuFwVersion, seFwVersion } = SecuxDevice.resolveVersion(rsp);
-            this.#mcuVersion = mcuFwVersion;
-            this.#seVersion = seFwVersion;
+            if (this.#device.productId !== SECUX_USB_DEVICE.BOOTLOADER.productId) {
+                const data = SecuxDevice.prepareGetVersion();
+                const rsp = await this.Exchange(getBuffer(data));
+                const { mcuFwVersion, seFwVersion } = SecuxDevice.resolveVersion(rsp);
+                this.#mcuVersion = mcuFwVersion;
+                this.#seVersion = seFwVersion;
+
+                ITransport.mcuVersion = mcuFwVersion;
+                ITransport.seVersion = seFwVersion;
+            }
 
             ITransport.deviceType = DeviceType.crypto;
-            ITransport.mcuVersion = mcuFwVersion;
-            ITransport.seVersion = seFwVersion;
         } catch (e) {
             throw e;
         }
