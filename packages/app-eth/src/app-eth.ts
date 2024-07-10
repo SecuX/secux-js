@@ -136,9 +136,9 @@ class SecuxETH {
      * @param {string} path m/44'/60'/... 
      * @param {communicationData} serialized unsigned transaction
      * @param {TransactionType} [txType] transaction type
-     * @returns {communicationData} data for sending to device
+     * @returns {prepared} prepared object
      */
-    static prepareSignSerialized(path: string, serialized: communicationData, txType?: TransactionType): communicationData {
+    static prepareSignSerialized(path: string, serialized: communicationData, txType?: TransactionType) {
         ow(serialized, ow_communicationData);
 
 
@@ -146,7 +146,7 @@ class SecuxETH {
         logger?.debug(`- prepareSignSerialized\ninput serialized tx: ${buf.toString("hex")}`);
         const builder = ETHTransactionBuilder.deserialize(buf);
 
-        return prepareSign(path, builder, txType).commandData;
+        return prepareSign(path, builder, txType);
     }
 
     /**
@@ -360,8 +360,8 @@ class SecuxETH {
     static async sign(this: ITransport, path: string, typedData: JsonString, chainId?: number): Promise<{ signature: string }>
     static async sign(this: ITransport, path: string, args: any, option?: any) {
         const signSerialized = async () => {
-            const data = SecuxETH.prepareSignSerialized(path, args, option);
-            const rsp = await this.Exchange(getBuffer(data));
+            const { commandData } = SecuxETH.prepareSignSerialized(path, args, option);
+            const rsp = await this.Exchange(getBuffer(commandData));
             let signature = Buffer.from(SecuxETH.resolveSignature(rsp), "hex");
             signature = ETHTransactionBuilder.deserialize(getBuffer(args)).getSignature(signature);
 
