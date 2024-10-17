@@ -25,7 +25,7 @@ import { Devices } from "./interface";
 export { SecuxWebBLE };
 
 
-const callback = () => { };
+const callback = () => {};
 const ValueChangedId = "characteristicvaluechanged";
 const GattDisconnectedId = "gattserverdisconnected";
 
@@ -42,6 +42,7 @@ class SecuxWebBLE extends ITransport {
     #customerId: string = '';
     #reader?: BluetoothRemoteGATTCharacteristic;
     #writer?: BluetoothRemoteGATTCharacteristic;
+    #receivedData?: Buffer = undefined;
     #type?: DeviceType;
     #connected: boolean = false;
     #OnConnected: Function;
@@ -113,11 +114,20 @@ class SecuxWebBLE extends ITransport {
         ITransport.deviceType = this.#type;
 
         await this.#reader.startNotifications();
-        this.#reader.addEventListener(ValueChangedId, this.#handleNotifications);
-
         if (this.#type === DeviceType.nifty) {
-            await this.#checkPairing();
+            try {
+                this.#reader.addEventListener(ValueChangedId, this.#handlePairing);
+                await this.#checkPairing();
+            }
+            finally {
+                this.#reader.removeEventListener(ValueChangedId, this.#handlePairing);
+                this.#reader.addEventListener(ValueChangedId, this.#handleNotifications);
+            }
+
             await this.#setDeviceInfo();
+        }
+        else {
+            this.#reader.addEventListener(ValueChangedId, this.#handleNotifications);
         }
 
         this.#connected = true;
@@ -178,23 +188,32 @@ class SecuxWebBLE extends ITransport {
         if (value.buffer) this.ReceiveData(Buffer.from(value.buffer));
     }
 
+    #handlePairing = (event: Event) => {
+        //@ts-ignore
+        const value = event.target?.value;
+        if (value.buffer) {
+            this.#receivedData = Buffer.from(value.buffer);
+        }
+        else {
+            this.#receivedData = undefined;
+        }
+    }
+
     async #checkPairing() {
         const timeout = 120000;
-        const interval = 5000;
+        const interval = 1000;
 
         const echoTest = async () => {
             const payload = Buffer.from([0x70, 0x61, 0x69, 0x72, 0x69, 0x6e, 0x67]);
             const data = Buffer.from([0x80 + 2 + payload.length, 0xf8, 0x08, ...payload]);
             await this.Write(data);
 
-            let rsp = await this.Read();
-            while (!rsp) {
-                rsp = await this.Read();
-                await new Promise(resolve => setTimeout(resolve, 1));
+            while (!this.#receivedData) {
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
 
             data[1] = 0;
-            if (data.equals(rsp.slice(0, data.length))) return true;
+            if (data.equals(this.#receivedData.slice(0, data.length))) return true;
 
             return false;
         };
@@ -211,7 +230,7 @@ class SecuxWebBLE extends ITransport {
                 this.#writer = await service.getCharacteristic(info.RX);
 
                 await this.#reader.startNotifications();
-                this.#reader.addEventListener(ValueChangedId, this.#handleNotifications);
+                this.#reader.addEventListener(ValueChangedId, this.#handlePairing);
             }
 
             try {

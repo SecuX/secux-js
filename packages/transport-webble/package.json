@@ -1,6 +1,6 @@
 {
   "name": "@secux/transport-webble",
-  "version": "3.3.2",
+  "version": "3.3.3",
   "description": "Secux Hardware Wallet webBLE API for communication layer",
   "keywords": [
     "secux",
