@@ -1,6 +1,6 @@
 {
   "name": "@secux/app-btc",
-  "version": "3.2.11",
+  "version": "3.2.12",
   "description": "SecuX Hardware Wallet BTC API",
   "keywords": [
     "secux",

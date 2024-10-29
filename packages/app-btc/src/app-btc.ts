@@ -366,7 +366,7 @@ export class SecuxBTC {
         const coin = option?.coin ?? CoinType.BITCOIN;
         const script = option?.script ?? getDefaultScript(`m/${_xpub.purpose}'`);
 
-        return SecuxBTC.addressConvert(publickey, { coin, script });
+        return SecuxBTC.addressConvert(getBuffer(publickey), { coin, script });
     }
 
     /**
