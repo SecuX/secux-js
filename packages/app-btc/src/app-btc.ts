@@ -38,6 +38,8 @@ import {
 } from './utils';
 import { IPlugin, ITransport, staticImplements } from "@secux/transport";
 import { PaymentBTC } from './payment';
+import { PaymentBCH } from './payment_bch';
+import { PaymentGRS } from './payment_grs';
 export { AddressOption, CoinType, ScriptType, txInput, txOutput, txOutputAddress, txOutputScriptExtened };
 
 
@@ -409,7 +411,18 @@ export class SecuxBTC {
      */
     static validateAddress(address: string, coin: CoinType = CoinType.BITCOIN): boolean {
         try {
-            PaymentBTC.decode(coin, address);
+            switch (coin) {
+                case CoinType.BITCOINCASH:
+                    PaymentBCH.decode(coin, address);
+                    break;
+
+                case CoinType.GROESTL:
+                    PaymentGRS.decode(coin, address);
+                    break;
+
+                default:
+                    PaymentBTC.decode(coin, address);
+            }
         } catch (error) {
             return false;
         }
