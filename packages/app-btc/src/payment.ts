@@ -40,7 +40,7 @@ class PaymentBTC {
     /**
      * Pay to Public Key Hash for BTC compatible coin
      * @param {CoinType} coin 
-     * @param {Buffer} param1 [publickey | hashed publickey]
+     * @param {Buffer} opt [publickey | hashed publickey]
      * @returns 
      */
     static p2pkh(coin: CoinType, opt: {
@@ -90,7 +90,7 @@ class PaymentBTC {
     /**
      * Pay to Witness Public Key Hash
      * @param {CoinType} coin
-     * @param {Buffer} param1 [publickey | hashed publickey]
+     * @param {Buffer} opt [publickey | hashed publickey]
      * @returns 
      */
     static p2wpkh(coin: CoinType, opt: { publickey?: Buffer, hash?: Buffer }): { address: string, scriptPublickey: Buffer, redeemHash: Buffer } {
@@ -111,6 +111,30 @@ class PaymentBTC {
 
         const redeemHash = Hash160(scriptPublickey);
         logger?.info(`redeem hash: ${redeemHash.toString('hex')}`);
+
+        return { address, scriptPublickey, redeemHash };
+    }
+
+    /**
+     * Pay to Witness Script Hash
+     * @param {CoinType} coin
+     * @param {Buffer} opt [witness | hashed redeem]
+     * @returns 
+     */
+    static p2wsh(coin: CoinType, opt: { witness?: Array<Buffer>, hash?: Buffer }): { address: string, scriptPublickey: Buffer, redeemHash: Buffer } {
+        this.CoinSupported(coin);
+        if (!opt.witness && !opt.hash) throw Error('Invalid Parameters');
+
+        const redeemHash = (opt.hash) ? opt.hash : Sha256(opt.witness![opt.witness!.length - 1]);
+        logger?.info(`redeem hash: ${redeemHash.toString('hex')}`);
+
+        let network = coinmap[coin];
+        const words = bech32.toWords(redeemHash);
+        words.unshift(0x00);
+        const address = bech32.encode(network.bech32!, words);
+
+        const op = Buffer.from([OPCODES.OP_0, 0x20]);
+        const scriptPublickey = Buffer.concat([op, redeemHash]);
 
         return { address, scriptPublickey, redeemHash };
     }
@@ -198,8 +222,9 @@ class PaymentBTC {
                 case 0:
                     const hash160 = Buffer.from(bech32.fromWords(result.words));
                     logger?.debug(`bech32 address: ${address}\nbech32 decoded: ${hash160.toString("hex")}`);
-                    return this.p2wpkh(coin, { hash: hash160 }).scriptPublickey;
 
+                    if (hash160.length == 20) return this.p2wpkh(coin, { hash: hash160 }).scriptPublickey;
+                    if (hash160.length == 32) return this.p2wsh(coin, { hash: hash160 }).scriptPublickey;
                 case 1:
                     const tweaked = Buffer.from(bech32m.fromWords(result.words));
                     logger?.debug(`bech32m address: ${address}\nbech32m decoded: ${tweaked.toString("hex")}`);
@@ -229,6 +254,7 @@ class PaymentBTC {
         if (this.isP2WPKH(script)) return ScriptType.P2WPKH;
         if (this.isP2PKH(script)) return ScriptType.P2PKH;
         if (this.isP2TR(script)) return ScriptType.P2TR;
+        if (this.isP2WSH(script)) return ScriptType.P2WSH;
 
         throw Error(`non-standard script: ${script.toString("hex")}`);
     }
@@ -270,6 +296,17 @@ class PaymentBTC {
         return true;
     }
 
+    static isP2WSH(script: Buffer): boolean {
+        if (
+            script.length !== 34 ||
+            script[0] !== OPCODES.OP_0 ||
+            script[1] !== 0x20
+        )
+            return false;
+
+        return true;
+    }
+
     static isP2TR(script: Buffer): boolean {
         if (
             script.length !== 34 ||
@@ -283,14 +320,18 @@ class PaymentBTC {
 }
 
 
+function Sha256(data: Buffer): Buffer {
+    const sha = sha256().update(data).digest();
+    return Buffer.from(sha);
+}
+
 function Hash160(publickey: Buffer): Buffer {
-    const sha = Buffer.from(sha256().update(publickey).digest());
+    const sha = Sha256(publickey);
     return Buffer.from(ripemd160().update(sha).digest());
 }
 
-function Hash256(data: Buffer) {
-    const sha1 = sha256().update(data).digest();
-    const sha2 = sha256().update(sha1).digest();
-
-    return Buffer.from(sha2);
+function Hash256(data: Buffer): Buffer {
+    const sha1 = Sha256(data);
+    const sha2 = Sha256(sha1);
+    return sha2;
 }

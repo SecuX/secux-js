@@ -30,6 +30,7 @@ export enum ScriptType {
     P2SH_P2PKH,
     P2SH_P2WPKH,
     P2TR,
+    P2WSH,
     __LENGTH
 }
 
