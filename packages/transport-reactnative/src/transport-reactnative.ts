@@ -18,7 +18,6 @@ limitations under the License.
 
 
 require("./shim.js");
-const { Platform } = require("react-native");
 import {
     Device, BleError, Characteristic, BleManager, State, ScanCallbackType, ScanMode, Service, Subscription
 } from "react-native-ble-plx";
@@ -173,14 +172,6 @@ class SecuxReactNativeBLE extends ITransport {
         if (this.#scanning) throw Error("Already scanning.");
 
         await bleEnabled();
-
-        if (Platform.OS === "android") {
-            const RNSettings = require("react-native-settings").default;
-
-
-            const location = await RNSettings.getSetting(RNSettings.LOCATION_SETTING);
-            if (location !== RNSettings.ENABLED) throw Error("Please turn on location service on your mobile phone.");
-        }
 
         this.#scanning = true;
 

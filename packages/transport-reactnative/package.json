@@ -1,6 +1,6 @@
 {
   "name": "@secux/transport-reactnative",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "description": "SecuX Hardware Wallet react native API for communication layer",
   "keywords": [
     "secux",
@@ -35,7 +35,6 @@
     "process": "^0.11.10"
   },
   "peerDependencies": {
-    "react-native-ble-plx": "^2.0.2",
-    "react-native-settings": "^0.2.3"
+    "react-native-ble-plx": "^2.0.2"
   }
 }
