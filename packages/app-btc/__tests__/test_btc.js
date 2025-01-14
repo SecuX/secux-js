@@ -40,7 +40,13 @@ export function test_address(GetDevice, root) {
                 assert.equal(address.startsWith("bc1q"), true);
             });
 
-            it("can derive address", () => {
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address);
+
+                assert.equal(type, ScriptType.P2WPKH);
+            });
+
+            it("can derive address", async () => {
                 const zpub = "zpub6qXWDwr8vMMMCCN6ep7SV8MWSzsTdX62fcbdcQDywo9cYmC5cFrHJwsxUD1JEVmFu3SpoYb4R6TotpB7h2WxULu1o2sVrERGz8mekTPHNJ5";
                 const test = [
                     { address: "bc1qnqqpnffkad3px7nefpg4c90z96qglm27nl4zma", change: 0, index: 0 },
@@ -95,6 +101,12 @@ export function test_address(GetDevice, root) {
                 assert.equal(address.startsWith("3"), true);
             });
 
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address);
+
+                assert.equal(type, ScriptType.P2SH);
+            });
+
             it("can derive address", () => {
                 const ypub = "ypub6X4fvckSrXb2fR6eR8Hq1bEWsvs36JiyZbn89WJTq3nyERbroaf1MGvat6AisWdtH1v3fq2HVrSHDMBhgEm5raXKp3dhGhUy4ed7XiXYAZb";
                 const test = [
@@ -146,6 +158,12 @@ export function test_address(GetDevice, root) {
 
                 assert.equal(valid, true);
                 assert.equal(address.startsWith("1"), true);
+            });
+
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address);
+
+                assert.equal(type, ScriptType.P2PKH);
             });
 
             it("can derive address", () => {
@@ -229,7 +247,7 @@ export function test_address(GetDevice, root) {
                     assert.equal(address, _.address);
                 }
             });
-        })
+        });
     });
 }
 

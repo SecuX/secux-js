@@ -255,6 +255,8 @@ class PaymentBTC {
         if (this.isP2PKH(script)) return ScriptType.P2PKH;
         if (this.isP2TR(script)) return ScriptType.P2TR;
         if (this.isP2WSH(script)) return ScriptType.P2WSH;
+        // can not distinguish P2SH_P2PKH or P2SH_P2WPKH
+        if (this.isP2SH(script)) return ScriptType.P2SH;
 
         throw Error(`non-standard script: ${script.toString("hex")}`);
     }

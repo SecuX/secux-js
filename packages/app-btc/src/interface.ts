@@ -27,6 +27,7 @@ export { OPCODES } from "./coindef";
 export enum ScriptType {
     P2PKH,
     P2WPKH,
+    P2SH,
     P2SH_P2PKH,
     P2SH_P2WPKH,
     P2TR,

@@ -1,4 +1,4 @@
-const { ScriptType } = require("@secux/app-btc");
+const { ScriptType, SecuxBTC, CoinType } = require("@secux/app-btc");
 const { SecuxBCH } = require("@secux/app-bch");
 const bitGoUTXO = require("@bitgo/utxo-lib");
 const { pubKeyHash, scriptHash } = require("@bitgo/utxo-lib/dist/src/templates");
@@ -42,6 +42,12 @@ export function test_address(GetDevice, root) {
                 assert.equal(valid, true);
                 assert.equal(address.startsWith("q"), true);
             });
+
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address, CoinType.BITCOINCASH);
+
+                assert.equal(type, ScriptType.P2PKH);
+            });
         });
 
         describe("p2sh(p2pkh) address", () => {
@@ -75,6 +81,12 @@ export function test_address(GetDevice, root) {
 
                 assert.equal(valid, true);
                 assert.equal(address.startsWith("p"), true);
+            });
+
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address, CoinType.BITCOINCASH);
+
+                assert.equal(type, ScriptType.P2SH);
             });
         });
 

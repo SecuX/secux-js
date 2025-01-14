@@ -429,6 +429,35 @@ export class SecuxBTC {
 
         return true;
     }
+
+    /**
+     * Get script type of address.
+     * @param {string} address
+     * @param {CoinType} [coin] default: CoinType.BITCOIN
+     * @returns {ScriptType} script type of address
+     */
+    static getScriptType(address: string, coin: CoinType = CoinType.BITCOIN): ScriptType {
+        try {
+            switch (coin) {
+                case CoinType.BITCOINCASH: {
+                    const script = PaymentBCH.decode(coin, address);
+                    return PaymentBCH.classify(script);
+                }
+
+                case CoinType.GROESTL: {
+                    const script = PaymentGRS.decode(coin, address);
+                    return PaymentGRS.classify(script);                    
+                }
+                    
+                default: {
+                    const script = PaymentBTC.decode(coin, address);
+                    return PaymentBTC.classify(script);
+                }
+            }
+        } catch (error) {
+            throw Error("unknown script type");
+        }
+    }
 }
 
 loadPlugin(SecuxBTC, "SecuxBTC");

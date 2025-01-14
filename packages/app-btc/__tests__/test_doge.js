@@ -1,4 +1,4 @@
-const { CoinType } = require("@secux/app-btc");
+const { CoinType, SecuxBTC, ScriptType } = require("@secux/app-btc");
 const { SecuxDOGE } = require("@secux/app-doge");
 const { coinmap } = require("@secux/app-btc/src/interface");
 const { getInputData, getOutputData } = require("./test_btc");
@@ -40,6 +40,12 @@ export function test_address(GetDevice, root) {
                 //assert.equal(valid, true);
                 assert.equal(address.startsWith("doge1"), true);
             });
+
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address, CoinType.DOGECOIN);
+
+                assert.equal(type, ScriptType.P2WPKH);
+            });
         });
 
         describe("segwit address", () => {
@@ -70,6 +76,12 @@ export function test_address(GetDevice, root) {
                 //assert.equal(valid, true);
                 assert.equal(address.startsWith("9") || address.startsWith("A"), true);
             });
+
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address, CoinType.DOGECOIN);
+
+                assert.equal(type, ScriptType.P2SH);
+            });
         });
 
         describe("legacy address", () => {
@@ -97,6 +109,12 @@ export function test_address(GetDevice, root) {
 
                 assert.equal(valid, true);
                 assert.equal(address.startsWith("D"), true);
+            });
+
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address, CoinType.DOGECOIN);
+
+                assert.equal(type, ScriptType.P2PKH);
             });
         });
     });

@@ -1,4 +1,4 @@
-const { CoinType, ScriptType } = require("@secux/app-btc");
+const { CoinType, ScriptType, SecuxBTC } = require("@secux/app-btc");
 const { getDefaultScript } = require("@secux/app-btc/lib/utils");
 const { SecuxGRS } = require("@secux/app-grs");
 const grs = require("groestlcoinjs-lib");
@@ -39,6 +39,12 @@ export function test_address(GetDevice, root) {
                 assert.equal(valid.type, "p2pkh");
                 assert.equal(valid.network, "mainnet");
                 assert.equal(valid.bech32, false);
+            });
+
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address, CoinType.GROESTL);
+
+                assert.equal(type, ScriptType.P2PKH);
             });
 
             it("can derive address", () => {
@@ -98,6 +104,12 @@ export function test_address(GetDevice, root) {
                 assert.equal(valid.bech32, false);
             });
 
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address, CoinType.GROESTL);
+
+                assert.equal(type, ScriptType.P2SH);
+            });
+
             it("can derive address", () => {
                 const ypub = "ypub6YDn6ra31rUh3TwFuytgMdDrXNk6DgUQUYaVGK2D18WZtjtHtZeDoBwfnQheazRSbUDdSZvpRWxaNqu28RaVysQqRfgw8NG5XaJ2x2d1ZKd";
                 const test = [
@@ -151,6 +163,12 @@ export function test_address(GetDevice, root) {
                 assert.equal(valid.type, "p2wpkh");
                 assert.equal(valid.network, "mainnet");
                 assert.equal(valid.bech32, true);
+            });
+
+            it("can check address type", () => {
+                const type = SecuxBTC.getScriptType(address, CoinType.GROESTL);
+
+                assert.equal(type, ScriptType.P2WPKH);
             });
 
             it("can derive address", () => {
