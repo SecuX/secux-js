@@ -30,6 +30,7 @@ import { validateEscrowCancel } from "./xrpl/models/transactions/escrowCancel";
 import { validateEscrowFinish } from "./xrpl/models/transactions/escrowFinish";
 import { validateAccountSet } from "./xrpl/models/transactions/accountSet";
 import { validateAccountDelete } from "./xrpl/models/transactions/accountDelete";
+import { validateTrustSet } from "./xrpl/models/transactions/trustSet";
 export const ow_address = ow.string.matches(/^r[0-9A-Za-z]+$/);
 
 
@@ -40,7 +41,7 @@ export interface baseObject {
     "AccountSet" | "AccountDelete" |
     "EscrowCreate" | "EscrowCancel" | "EscrowFinish" |
     "Payment" | "PaymentChannelClaim" | "PaymentChannelCreate" | "PaymentChannelFund" |
-    "OfferCreate" | "OfferCancel",
+    "OfferCreate" | "OfferCancel" | "TrustSet",
     Account?: string,
     Sequence: number,
     Fee: string | number,
@@ -49,7 +50,7 @@ export interface baseObject {
     Destination?: string,
     Amount?: string | number,
     SourceTag?: number,
-    DestinationTag?: number
+    DestinationTag?: number,
 }
 
 export const validator: { [type: string]: (arg: any) => void } = {
@@ -64,6 +65,7 @@ export const validator: { [type: string]: (arg: any) => void } = {
     PaymentChannelFund: validatePaymentChannelFund,
     OfferCreate: validateOfferCreate,
     OfferCancel: validateOfferCancel,
+    TrustSet: validateTrustSet,
 }
 
 export const TransactionTypes = Object.keys(validator);
