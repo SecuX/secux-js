@@ -1,4 +1,4 @@
-const { SecuxADA, AddressType } = require("@secux/app-ada");
+const { SecuxADA, AddressType, DrepType } = require("@secux/app-ada");
 const { NetworkInfo } = require("@secux/app-ada/lib/interface");
 const cardano = require("cardano-crypto.js");
 const { assert } = require("chai");
@@ -215,29 +215,55 @@ export function test(GetDevice) {
 
 
             let raw_tx;
-            it("can do deregistration", async () => {
-                const { commandData, serialized } = SecuxADA.prepareWithdraw(input, 158463);
+            it("can do withdraw", async () => {
+                const { commandData, serialized } = SecuxADA.prepareWithdraw(input, "158463");
                 const rsp = await GetDevice().Exchange(commandData);
                 raw_tx = SecuxADA.resolveTransaction(rsp, serialized);
             }).timeout(20000);
 
             it("can directly sign", async () => {
-                const signed = await GetDevice().sign(input, 158463);
+                const signed = await GetDevice().sign(input, "158463");
+
+                assert.equal(signed.raw_tx, raw_tx);
+            }).timeout(20000);
+        });
+
+        describe("voteDelegation", () => {
+            const input = {
+                path: "m/1852'/1815'/0'",
+                utxo: [
+                    {
+                        txId: "ddd0c3b8a0dc1350f554e919e59fd7249133c7894e21c84ca3be3520fd1ff07a",
+                        index: 0,
+                        amount: 12827459,
+                    }
+                ],
+                changeAddress: "addr1qyk54vyyc856ngxermdzqhxnlk376ykkupru8rxcyryvg4kxs4un3x4r4rq422kwrtvc8p2a20dzhyr5v0n9lhwy2u6sfjujuz",
+                xpublickey: "c232950d7c27b78542795ce4cad053e8dfaab7679ba5477563be5c60c1a4d0613fc81fd9bb8f30822c1252c29cc6af147831da44fb86acad6c04fcc95700b92b"
+            };
+
+
+            let raw_tx;
+            it("can do vote delegation", async () => {
+                const { commandData, serialized } = SecuxADA.prepareVoteDelegation(input, DrepType.ABSTAIN);
+                const rsp = await GetDevice().Exchange(commandData);
+                raw_tx = SecuxADA.resolveTransaction(rsp, serialized);
+            }).timeout(20000);
+
+            it("can directly sign", async () => {
+                const signed = await GetDevice().sign(input, DrepType.ABSTAIN);
 
                 assert.equal(signed.raw_tx, raw_tx);
             }).timeout(20000);
         });
     });
 
-    describe("broadcast", () => {
+    describe.skip("broadcast", () => {
         const path = "m/1852'/1815'/0'";
+        const api = "https://cardano-preview.blockfrost.io/api/v0";
+        const project_id = "previewM8HajjWRhsvXQ76DMbuMOTKFrDCyqoQb";
 
-        it("transfer", async () => {
-            const address = await GetDevice().getAddress(path, AddressType.BASE, { network: NetworkInfo.preview });
-
-            const api = "https://cardano-preview.blockfrost.io/api/v0";
-            const project_id = "previewM8HajjWRhsvXQ76DMbuMOTKFrDCyqoQb";
-
+        const getUTXO = async (address) => {
             const response = await fetch(
                 `${api}/addresses/${address}/utxos`,
                 {
@@ -248,11 +274,36 @@ export function test(GetDevice) {
                 }
             ).then(x => x.json());
 
-            const inputs = response.map(utxo => ({
-                path,
+            const utxo = response.map(utxo => ({
                 txId: utxo.tx_hash,
                 index: utxo.output_index,
                 amount: utxo.amount[0].quantity,
+            }));
+
+            return utxo;
+        };
+
+        const submit = async (tx) => {
+            const txid = await fetch(
+                `${api}/tx/submit`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/cbor",
+                        project_id,
+                    },
+                    body: Buffer.from(tx, "base64"),
+                }
+            ).then(x => x.json());
+            console.log(txid);
+        };
+
+        it("transfer", async () => {
+            const address = await GetDevice().getAddress(path, AddressType.BASE, { network: NetworkInfo.preview });
+            const utxo = await getUTXO(address);
+            const inputs = utxo.map(utxo => ({
+                path,
+                ...utxo,
             }));
 
             const receipt = "addr_test1qqlp9x89h2d7hukhrdr86d7exv9q4mngjjypqq64vdmnfda4lrrpt832a8rw0u8wyn5uk2lszhl5vd4rftl33xx3ncdshrafpj";
@@ -261,18 +312,76 @@ export function test(GetDevice) {
                 { address: receipt, amount: 1000000 },
                 { changeAddress: address }
             );
+            await submit(raw_tx);
+        }).timeout(20000);
 
-            await fetch(
-                `${api}/tx/submit`,
+        it("stake", async () => {
+            const address = await GetDevice().getAddress(path, AddressType.BASE, { network: NetworkInfo.preview });
+            const utxo = await getUTXO(address);
+
+            const { raw_tx } = await GetDevice().sign(
                 {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/cbor",
-                        project_id,
-                    },
-                    body: Buffer.from(raw_tx, "base64"),
+                    path,
+                    utxo,
+                    changeAddress: address,
+                },
+                "ce31146655943b0b4920d06e6b62df31fef02d9df9059ca42585f6c9",
+                {
+                    needRegistration: true
                 }
             );
+            await submit(raw_tx);
+        }).timeout(20000);
+
+        it("vote delegation", async () => {
+            const address = await GetDevice().getAddress(path, AddressType.BASE, { network: NetworkInfo.preview });
+            const utxo = await getUTXO(address);
+
+            const { raw_tx } = await GetDevice().sign(
+                {
+                    path,
+                    utxo,
+                    changeAddress: address,
+                },
+                DrepType.ABSTAIN,
+            );
+            await submit(raw_tx);
+        }).timeout(20000);
+
+        it("withdraw", async () => {
+            const address = await GetDevice().getAddress(path, AddressType.BASE, { network: NetworkInfo.preview });
+            const utxo = await getUTXO(address);
+
+            const { raw_tx } = await GetDevice().sign(
+                {
+                    path,
+                    utxo,
+                    changeAddress: address,
+                },
+                "1000000",
+                {
+                    network: NetworkInfo.preview,
+                }
+            );
+            await submit(raw_tx);
+        }).timeout(20000);
+
+        it("unstake", async () => {
+            const address = await GetDevice().getAddress(path, AddressType.BASE, { network: NetworkInfo.preview });
+            const utxo = await getUTXO(address);
+
+            const { raw_tx } = await GetDevice().sign(
+                {
+                    path,
+                    utxo,
+                    changeAddress: address,
+                },
+                {
+                    network: NetworkInfo.preview,
+                    withdrawAmount: 1000000,
+                }
+            );
+            await submit(raw_tx);
         }).timeout(20000);
     })
 }

@@ -21,16 +21,16 @@ import { cardano } from "./load_lib";
 const cardanoV1 = require("cardano-crypto.js");
 import { communicationData, getBuffer, ow_communicationData, toCommunicationData, wrapResult } from "@secux/utility/lib/communication";
 import {
-    AddressOption, AddressType, NetworkInfo, ow_AddressOption, ow_fullPath, ow_path, ow_PointerOption, ow_poolHash,
-    ow_signOption, ow_stakeInput, ow_stakeOption, ow_txInput, ow_txOutput, ow_unstakeOption, ow_withdrawOption,
-    ow_xpublickey, signOption, stakeInput, stakeOption, txInput, txOutput, unstakeOption, withdrawOption
+    AddressOption, AddressType, DrepType, NetworkInfo, ow_AddressOption, ow_fullPath, ow_path, ow_PointerOption, ow_poolHash,
+    ow_SignOption, ow_StakeInput, ow_StakeOption, ow_TxInput, ow_TxOutput, ow_UnStakeOption, ow_WithdrawOption,
+    ow_xpublickey, SignOption, StakeInput, StakeOption, TxInput, TxOutput, UnStakeOption, WithdrawOption
 } from "./interface";
 import { SecuxTransactionTool } from "@secux/protocol-transaction";
 import { EllipticCurve, TransactionType } from "@secux/protocol-transaction/lib/interface";
 import ow from "ow";
 import { loadPlugin, Logger, owTool, Signature } from "@secux/utility";
 import { IPlugin, ITransport, staticImplements } from "@secux/transport";
-export { SecuxADA, AddressType };
+export { SecuxADA, AddressType, DrepType };
 const logger = Logger?.child({ id: "ada" });
 
 
@@ -84,14 +84,14 @@ class SecuxADA {
             case AddressType.BASE:
                 return cardano.BaseAddress.new(
                     network.id,
-                    cardano.StakeCredential.from_keyhash(utxoKey.to_raw_key().hash()),
-                    cardano.StakeCredential.from_keyhash(stakeKey.to_raw_key().hash())
+                    cardano.Credential.from_keyhash(utxoKey.to_raw_key().hash()),
+                    cardano.Credential.from_keyhash(stakeKey.to_raw_key().hash())
                 ).to_address().to_bech32();
 
             case AddressType.ENTERPRISE:
                 return cardano.EnterpriseAddress.new(
                     network.id,
-                    cardano.StakeCredential.from_keyhash(utxoKey.to_raw_key().hash())
+                    cardano.Credential.from_keyhash(utxoKey.to_raw_key().hash())
                 ).to_address().to_bech32();
 
             case AddressType.POINTER:
@@ -99,7 +99,7 @@ class SecuxADA {
                 ow(params, ow_PointerOption);
                 return cardano.PointerAddress.new(
                     network.id,
-                    cardano.StakeCredential.from_keyhash(utxoKey.to_raw_key().hash()),
+                    cardano.Credential.from_keyhash(utxoKey.to_raw_key().hash()),
                     cardano.Pointer.new(
                         params.slot,
                         params.txIndex,
@@ -110,7 +110,7 @@ class SecuxADA {
             case AddressType.REWARD:
                 return cardano.RewardAddress.new(
                     network.id,
-                    cardano.StakeCredential.from_keyhash(stakeKey.to_raw_key().hash())
+                    cardano.Credential.from_keyhash(stakeKey.to_raw_key().hash())
                 ).to_address().to_bech32();
 
             default:
@@ -163,15 +163,15 @@ class SecuxADA {
 
     /**
      * Prepare data for signing.
-     * @param {Array<txInput>} inputs 
-     * @param {txOutput} output 
-     * @param {signOption} [option] 
+     * @param {Array<TxInput>} inputs 
+     * @param {TxOutput} output 
+     * @param {SignOption} [option] 
      * @returns {prepared}
      */
-    static prepareSign(inputs: Array<txInput>, output: txOutput, option?: signOption) {
-        ow(inputs, ow.array.ofType(ow_txInput));
-        ow(output, ow_txOutput);
-        ow(option as signOption, ow.any(ow.undefined, ow_signOption));
+    static prepareSign(inputs: Array<TxInput>, output: TxOutput, option?: SignOption) {
+        ow(inputs, ow.array.ofType(ow_TxInput));
+        ow(output, ow_TxOutput);
+        ow(option as SignOption, ow.any(ow.undefined, ow_SignOption));
 
 
         const config = (output.address.startsWith("DdzFF")) ? cardano.__byronConfig : cardano.__config;
@@ -235,8 +235,9 @@ class SecuxADA {
             const pubkeyHex = txObj.pathMap[paths[i]];
             const publickey = cardano.PublicKey.from_bytes(convertToBuffer(pubkeyHex));
             const signature = cardano.Ed25519Signature.from_hex(signatures[i]);
+            const transactionHash = cardano.FixedTransactionBody.from_hex(txObj.rawTx).tx_hash().to_bytes();
 
-            if (!publickey.verify(cardano.hash_transaction(txbody).to_bytes(), signature)) {
+            if (!publickey.verify(transactionHash, signature)) {
                 logger?.error(`signature error, got signature ${signatures[i]} and publickey ${pubkeyHex}`);
                 throw Error(`Signature error on path ${paths[i]}`);
             }
@@ -265,20 +266,20 @@ class SecuxADA {
 
     /**
      * Prepare data for signing.
-     * @param {stakeInput} input 
+     * @param {StakeInput} input 
      * @param {string} pool pool hash or id
-     * @param {stakeOption} [option] 
+     * @param {StakeOption} [option] 
      * @returns {prepared}
      */
-    static prepareStake(input: stakeInput, pool: string, option?: stakeOption) {
-        ow(input, ow_stakeInput);
+    static prepareStake(input: StakeInput, pool: string, option?: StakeOption) {
+        ow(input, ow_StakeInput);
         ow(pool, ow.any(ow_poolHash, owTool.hexString.length(56)));
-        ow(option as stakeOption, ow.any(ow.undefined, ow_stakeOption));
+        ow(option as StakeOption, ow.any(ow.undefined, ow_StakeOption));
 
 
         const stakeIndex = option?.stakeIndex ?? 0;
         const stakeKey = xpubToPublickey(convertToBuffer(input.xpublickey), 2, stakeIndex);
-        const stakeCert = cardano.StakeCredential.from_keyhash(
+        const stakeCert = cardano.Credential.from_keyhash(
             cardano.PublicKey.from_bytes(stakeKey).hash()
         );
 
@@ -321,18 +322,18 @@ class SecuxADA {
 
     /**
      * Prepare data for signing.
-     * @param {stakeInput} input 
-     * @param {unstakeOption} [option] 
+     * @param {StakeInput} input 
+     * @param {UnStakeOption} [option] 
      * @returns {prepared}
      */
-    static prepareUnstake(input: stakeInput, option?: unstakeOption) {
-        ow(input, ow_stakeInput);
-        ow(option as unstakeOption, ow.any(ow.undefined, ow_unstakeOption));
+    static prepareUnstake(input: StakeInput, option?: UnStakeOption) {
+        ow(input, ow_StakeInput);
+        ow(option as UnStakeOption, ow.any(ow.undefined, ow_UnStakeOption));
 
 
         const stakeIndex = option?.stakeIndex ?? 0;
         const stakeKey = xpubToPublickey(convertToBuffer(input.xpublickey), 2, stakeIndex);
-        const stakeCert = cardano.StakeCredential.from_keyhash(
+        const stakeCert = cardano.Credential.from_keyhash(
             cardano.PublicKey.from_bytes(stakeKey).hash()
         );
 
@@ -378,20 +379,20 @@ class SecuxADA {
 
     /**
      * Prepare data for signing.
-     * @param {stakeInput} input 
-     * @param {number | string} amount rewards
-     * @param {withdrawOption} [option] 
+     * @param {StakeInput} input 
+     * @param {string} amount rewards
+     * @param {WithdrawOption} [option] 
      * @returns {prepared}
      */
-    static prepareWithdraw(input: stakeInput, amount: number | string, option?: withdrawOption) {
-        ow(input, ow_stakeInput);
-        ow(amount, ow.any(ow.number.uint32.positive, owTool.numberString));
-        ow(option as withdrawOption, ow.any(ow.undefined, ow_withdrawOption));
+    static prepareWithdraw(input: StakeInput, amount: string, option?: WithdrawOption) {
+        ow(input, ow_StakeInput);
+        ow(amount, owTool.numberString);
+        ow(option as WithdrawOption, ow.any(ow.undefined, ow_WithdrawOption));
 
 
         const stakeIndex = option?.stakeIndex ?? 0;
         const stakeKey = xpubToPublickey(convertToBuffer(input.xpublickey), 2, stakeIndex);
-        const stakeCert = cardano.StakeCredential.from_keyhash(
+        const stakeCert = cardano.Credential.from_keyhash(
             cardano.PublicKey.from_bytes(stakeKey).hash()
         );
 
@@ -401,7 +402,7 @@ class SecuxADA {
                 option?.network?.id ?? NetworkInfo.mainnet.id,
                 stakeCert
             ),
-            cardano.BigNum.from_str(amount.toString(10))
+            cardano.BigNum.from_str(amount)
         );
 
         const inputs = input.utxo.map(x => ({
@@ -411,6 +412,53 @@ class SecuxADA {
         }));
         const { builder, paths, publickeys } = CreateBaseTransaction(inputs);
         builder.set_withdrawals(withdraws);
+
+        // need to sign with stake key
+        paths.push(`${input.path}/2/${stakeIndex}`);
+        publickeys.push(stakeKey);
+
+
+        const rawTx = CreateRawTransaction(builder, {
+            fee: option?.fee,
+            TimeToLive: option?.TimeToLive,
+            changeAddress: input.changeAddress
+        });
+        return CreateCommandData(paths, publickeys, rawTx);
+    }
+
+    static prepareVoteDelegation(input: StakeInput, drep: DrepType, option?: WithdrawOption) {
+        ow(input, ow_StakeInput);
+        ow(drep, ow.number.inRange(0, DrepType.__LENGTH - 1));
+        ow(option as WithdrawOption, ow.any(ow.undefined, ow_WithdrawOption));
+
+        const stakeIndex = option?.stakeIndex ?? 0;
+        const stakeKey = xpubToPublickey(convertToBuffer(input.xpublickey), 2, stakeIndex);
+        const stakeCert = cardano.Credential.from_keyhash(
+            cardano.PublicKey.from_bytes(stakeKey).hash()
+        );
+
+        let _drep;
+        switch (drep) {
+            case DrepType.NO:
+                _drep = cardano.DRep.new_always_no_confidence();
+                break;
+
+            default:
+                _drep = cardano.DRep.new_always_abstain();
+        }
+
+        const certs = cardano.Certificates.new();
+        certs.add(cardano.Certificate.new_vote_delegation(
+            cardano.VoteDelegation.new(stakeCert, _drep)
+        ));
+
+        const inputs = input.utxo.map(x => ({
+            path: input.path,
+            xpublickey: input.xpublickey,
+            ...x
+        }));
+        const { builder, paths, publickeys } = CreateBaseTransaction(inputs);
+        builder.set_certs(certs);
 
         // need to sign with stake key
         paths.push(`${input.path}/2/${stakeIndex}`);
@@ -455,10 +503,11 @@ class SecuxADA {
         return xpublickey;
     }
 
-    static async sign(this: ITransport, inputs: Array<txInput>, output: txOutput, option?: signOption): Promise<{ raw_tx: string }>
-    static async sign(this: ITransport, input: stakeInput, pool: string, option?: stakeOption): Promise<{ raw_tx: string }>
-    static async sign(this: ITransport, input: stakeInput, option?: unstakeOption): Promise<{ raw_tx: string }>
-    static async sign(this: ITransport, input: stakeInput, amount: number | string, option?: withdrawOption): Promise<{ raw_tx: string }>
+    static async sign(this: ITransport, inputs: Array<TxInput>, output: TxOutput, option?: SignOption): Promise<{ raw_tx: string }>
+    static async sign(this: ITransport, input: StakeInput, pool: string, option?: StakeOption): Promise<{ raw_tx: string }>
+    static async sign(this: ITransport, input: StakeInput, option?: UnStakeOption): Promise<{ raw_tx: string }>
+    static async sign(this: ITransport, input: StakeInput, amount: string, option?: WithdrawOption): Promise<{ raw_tx: string }>
+    static async sign(this: ITransport, input: StakeInput, drep: DrepType, option?: WithdrawOption): Promise<{ raw_tx: string }>
     static async sign(this: ITransport, ...args: any[]) {
         let func: any = SecuxADA.prepareSign;
         if (Array.isArray(args[0])) {
@@ -480,6 +529,9 @@ class SecuxADA {
 
             if (args[1] === undefined || typeof args[1] === "object") {
                 func = SecuxADA.prepareUnstake;
+            }
+            else if (typeof args[1] === "number") {
+                func = SecuxADA.prepareVoteDelegation;
             }
             else if (typeof args[1] === "string" && (args[1].startsWith("pool") || args[1].length === 56)) {
                 func = SecuxADA.prepareStake;
@@ -522,9 +574,9 @@ function xpubToPublickey(xpub: Buffer, change: number, index: number, useCIP1852
 }
 
 
-function CreateBaseTransaction(inputs: Array<txInput>, config?: Array<any>) {
+function CreateBaseTransaction(inputs: Array<TxInput>, config?: any) {
     const c = config ?? cardano.__config;
-    const builder = cardano.TransactionBuilder.new(...c);
+    const builder = cardano.TransactionBuilder.new(c);
 
     const paths: string[] = [];
     const publickeys: Buffer[] = [];
@@ -550,7 +602,7 @@ function CreateBaseTransaction(inputs: Array<txInput>, config?: Array<any>) {
     return { builder, paths, publickeys };
 }
 
-function CreateRawTransaction(builder: any, option?: signOption) {
+function CreateRawTransaction(builder: any, option?: SignOption) {
     if (!option) {
         builder.set_fee(builder.min_fee());
     }
@@ -636,7 +688,7 @@ function CreateCommandData(paths: Array<string>, publickeys: Array<Buffer>, rawT
 
 /**
  * The UTXO object.
- * @typedef {object} txInput
+ * @typedef {object} TxInput
  * @property {string} path 3-depth path of CIP-1852
  * @property {string | Buffer} xpublickey ED25519 publickey from `path`
  * @property {string} txId referenced transaction hash
@@ -648,14 +700,14 @@ function CreateCommandData(paths: Array<string>, publickeys: Array<Buffer>, rawT
 
 /**
  * The payment object.
- * @typedef {object} txOutput
+ * @typedef {object} TxOutput
  * @property {string} address receiver's address
  * @property {number | string} amount amount of payment
  */
 
 /**
  * Option for payment.
- * @typedef {object} signOption
+ * @typedef {object} SignOption
  * @property {string} [changeAddress] default: sender's address
  * @property {number | string} [fee]
  * @property {number} [TimeToLive]
@@ -663,7 +715,7 @@ function CreateCommandData(paths: Array<string>, publickeys: Array<Buffer>, rawT
 
 /**
  * Option for staking.
- * @typedef {object} stakeOption
+ * @typedef {object} StakeOption
  * @property {number} [stakeIndex] default: 0
  * @property {boolean} [needRegistration] include registration or not
  * @property {number | string} [fee]
@@ -672,7 +724,7 @@ function CreateCommandData(paths: Array<string>, publickeys: Array<Buffer>, rawT
 
 /**
  * Option for withdraw rewards.
- * @typedef {object} withdrawOption
+ * @typedef {object} WithdrawOption
  * @property {number} [stakeIndex] default: 0
  * @property {number | string} [fee]
  * @property {number} [TimeToLive]
@@ -680,7 +732,7 @@ function CreateCommandData(paths: Array<string>, publickeys: Array<Buffer>, rawT
 
 /**
  * Option for unstaking. (de-registration)
- * @typedef {object} unstakeOption
+ * @typedef {object} UnStakeOption
  * @property {number} [stakeIndex] default: 0
  * @property {boolean} [withdrawAmount] withdraw and de-registration
  * @property {number | string} [fee]
@@ -697,7 +749,7 @@ function CreateCommandData(paths: Array<string>, publickeys: Array<Buffer>, rawT
 
 /**
  * Parameters for staking operations.
- * @typedef {object} stakeInput
+ * @typedef {object} StakeInput
  * @property {string} path 3-depth path of CIP-1852
  * @property {Array<utxo>} utxo
  * @property {string} changeAddress owner's account

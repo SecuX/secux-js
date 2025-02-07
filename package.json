@@ -38,6 +38,7 @@
     "@types/react-native": "^0.73.0",
     "agent-base": "^6.0.2",
     "chai": "^4.3.4",
+    "cross-env": "^7.0.3",
     "crypto-browserify": "^3.12.0",
     "lerna": "^3.20.2",
     "mocha": "^9.0.3",

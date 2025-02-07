@@ -1,6 +1,6 @@
 {
   "name": "@secux/app-ada",
-  "version": "3.0.5",
+  "version": "3.1.0",
   "description": "SecuX Hardware Wallet ADA API",
   "keywords": [
     "secux",
@@ -26,15 +26,15 @@
     "access": "public"
   },
   "scripts": {
-    "build": "sh ../../build.sh",
+    "build": "cross-env NODE_OPTIONS=--max_old_space_size=4096 sh ../../build.sh",
     "doc": "npx tsc && jsdoc2md --template ./README.hbs ./lib/app-ada.js > README.md",
     "doc:api": "sh ../../api_doc.sh ./src/app-ada.ts ./lib/app-ada.js",
-    "test:webusb": "npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/usb.js",
-    "test:webble": "npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/ble.js",
-    "test:virtual": "npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/virtual.js"
+    "test:webusb": "cross-env NODE_OPTIONS=--max_old_space_size=4096 npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/usb.js",
+    "test:webble": "cross-env NODE_OPTIONS=--max_old_space_size=4096 npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/ble.js",
+    "test:virtual": "cross-env NODE_OPTIONS=--max_old_space_size=4096 webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/virtual.js"
   },
   "dependencies": {
-    "@emurgo/cardano-serialization-lib-asmjs": "^9.1.4",
+    "@emurgo/cardano-serialization-lib-asmjs": "^12.1.1",
     "@secux/protocol-transaction": "^3.1.0",
     "@secux/utility": "^3.0.6",
     "cardano-crypto.js": "^6.1.0",

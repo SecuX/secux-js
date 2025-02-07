@@ -101,7 +101,7 @@ export const ow_AddressOption = ow.object.partialShape({
     stakeIndex
 });
 
-export type txInput = {
+export type TxInput = {
     path: string,
     txId: string,
     index: number,
@@ -111,7 +111,7 @@ export type txInput = {
     stakeIndex?: number
 };
 
-export const ow_txInput = ow.object.exactShape({
+export const ow_TxInput = ow.object.exactShape({
     path: ow_path,
     txId,
     index,
@@ -121,17 +121,17 @@ export const ow_txInput = ow.object.exactShape({
     stakeIndex
 });
 
-export type txOutput = {
+export type TxOutput = {
     address: string,
     amount: number | string
 };
 
-export const ow_txOutput = ow.object.exactShape({
+export const ow_TxOutput = ow.object.exactShape({
     address: ow_address,
     amount
 });
 
-export type stakeInput = {
+export type StakeInput = {
     path: string,
     utxo: Array<{
         txId: string,
@@ -144,7 +144,7 @@ export type stakeInput = {
     stakeIndex?: number
 }
 
-export const ow_stakeInput = ow.object.exactShape({
+export const ow_StakeInput = ow.object.exactShape({
     path: ow_path,
     utxo: ow.array.ofType(ow.object.exactShape({
         txId,
@@ -157,54 +157,63 @@ export const ow_stakeInput = ow.object.exactShape({
     stakeIndex
 });
 
-interface baseOption {
+interface BaseOption {
     fee?: number | string;
     TimeToLive?: number;
 }
 
-const ow_baseOption = {
+const ow_BaseOption = {
     fee: ow.any(ow.undefined, ow.number.uint32.positive, owTool.numberString),
     TimeToLive: ow.optional.number.uint32.positive
 };
 
-export interface signOption extends baseOption {
+export interface SignOption extends BaseOption {
     changeAddress?: string;
 }
 
-export const ow_signOption = ow.object.exactShape({
+export const ow_SignOption = ow.object.exactShape({
     changeAddress: ow.any(ow.undefined, ow_shelleyAddress),
-    ...ow_baseOption
+    ...ow_BaseOption
 });
 
-export interface stakeOption extends baseOption {
+export interface StakeOption extends BaseOption {
     stakeIndex?: number;
     needRegistration?: boolean;
 }
 
-export const ow_stakeOption = ow.object.exactShape({
+export const ow_StakeOption = ow.object.exactShape({
     stakeIndex,
     needRegistration: ow.optional.boolean,
-    ...ow_baseOption
+    ...ow_BaseOption
 });
 
-export interface unstakeOption extends baseOption {
+export interface UnStakeOption extends BaseOption {
     stakeIndex?: number;
     withdrawAmount?: number | string;
     network?: typeof NetworkInfo.mainnet;
 }
 
-export const ow_unstakeOption = ow.object.exactShape({
+export const ow_UnStakeOption = ow.object.exactShape({
     stakeIndex,
     withdrawAmount: ow.any(ow.undefined, ow.number.uint32.positive, owTool.numberString),
-    ...ow_baseOption
+    network: ow.optional.object,
+    ...ow_BaseOption
 });
 
-export interface withdrawOption extends baseOption {
+export interface WithdrawOption extends BaseOption {
     stakeIndex?: number;
     network?: typeof NetworkInfo.mainnet;
 }
 
-export const ow_withdrawOption = ow.object.exactShape({
+export const ow_WithdrawOption = ow.object.exactShape({
     stakeIndex,
-    ...ow_baseOption
+    network: ow.optional.object,
+    ...ow_BaseOption
 });
+
+export enum DrepType {
+    ABSTAIN,
+    NO,
+
+    __LENGTH
+}
