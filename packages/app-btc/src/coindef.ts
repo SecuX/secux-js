@@ -161,5 +161,6 @@ export const OPCODES = Object.freeze({
     OP_EQUALVERIFY: 0x88,
     OP_CODESEPARATOR: 0xab,
     OP_CHECKSIG: 0xac,
-    OP_CHECKMULTISIG: 0xae
+    OP_CHECKMULTISIG: 0xae,
+    OP_RETURN: 0x6a
 });

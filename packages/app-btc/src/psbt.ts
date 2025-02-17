@@ -302,7 +302,7 @@ class SecuxPsbt {
                 SecuxTransactionTool.signRawTransactionList(_paths, _txs, confirmBuf)
             );
 
-            size = txs[i].length + 25;
+            size = txs[i].length + MAX_HEAD_SIZE;
             _txs = [txs[i]];
             _paths = [this.#paths[i]];
 
@@ -442,6 +442,7 @@ class SecuxPsbt {
         let data;
         switch (type) {
             case ScriptType.P2WPKH:
+            case ScriptType.P2SH:
             case ScriptType.P2SH_P2WPKH:
             case ScriptType.P2SH_P2PKH:
                 logger?.debug(ScriptType[type]);
@@ -531,11 +532,15 @@ class SecuxPsbt {
 
         for (let i = 0; i < this.#tx.outs.length; i++) {
             const { script, value } = this.#tx.outs[i];
+            if (this.#payment.isArbitraryData(script)) continue;
+
             const type = this.#payment.isP2SH(script)
                 ? ScriptType.P2SH_P2WPKH
                 : this.#payment.classify(script);
             const dust = getDustThreshold(type, dustRelayFee);
             const _value = BigNumber(value);
+
+            logger?.debug(`output #${i}\n${this.#payment.encode(this.#coin, script)}\n${_value.toFixed(0)}`);
 
             if (_value.lt(dust)) {
                 logger?.warn(`output #${i}: dust threshold is ${dust}, but got ${_value.toFixed(0)}`);
@@ -585,6 +590,7 @@ function getMeaningfulScript(
 ) {
     let meaningfulScript;
     switch (scriptType) {
+        case ScriptType.P2SH:
         case ScriptType.P2SH_P2PKH:
         case ScriptType.P2SH_P2WPKH:
             if (!redeemScript) throw Error("scriptPubkey is P2SH but redeemScript missing");

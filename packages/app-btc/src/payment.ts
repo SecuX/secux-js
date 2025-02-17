@@ -250,6 +250,42 @@ class PaymentBTC {
         throw Error(`ArgumentError: invalid address for ${CoinType[coin]}, got ${address}`);
     }
 
+    static encode(coin: CoinType, script: Buffer): string {
+        const network = coinmap[coin];
+        const scriptType = this.classify(script);
+        switch (scriptType) {
+            case ScriptType.P2PKH: {
+                const pkHash = script.slice(3, 3 + 20);
+                return this.bs58check.encode(pkHash, Buffer.from([network.pubKeyHash]));
+            }
+
+            case ScriptType.P2SH:
+            case ScriptType.P2SH_P2PKH:
+            case ScriptType.P2SH_P2WPKH: {
+                const redeemHash = script.slice(2, 2 + 20);
+                return this.bs58check.encode(redeemHash, Buffer.from([network.scriptHash]));
+            }
+
+            case ScriptType.P2WPKH:
+            case ScriptType.P2WSH: {
+                const hash = script.slice(2);
+                const words = bech32.toWords(hash);
+                words.unshift(0x00);
+                return bech32.encode(network.bech32!, words);
+            }
+
+            case ScriptType.P2TR: {
+                const tweaked = script.slice(2);
+                const version = script[0] - SEGWIT_VERSION_DIFF;
+                const words = bech32.toWords(tweaked);
+                words.unshift(version);
+                return bech32m.encode(network.bech32!, words);
+            }
+        }
+
+        throw Error(`not supported script: ${script.toString("hex")}`);
+    }
+
     static classify(script: Buffer): ScriptType {
         if (this.isP2WPKH(script)) return ScriptType.P2WPKH;
         if (this.isP2PKH(script)) return ScriptType.P2PKH;
@@ -316,6 +352,23 @@ class PaymentBTC {
             script[1] !== 0x20
         )
             return false;
+
+        return true;
+    }
+
+    static isArbitraryData(script: Buffer): boolean {
+        if (
+            // The limit on OP_RETURN output size is now applied to the entire serialized scriptPubKey, 83 bytes by default. 
+            // (the previous 80 byte default plus three bytes overhead)
+            script.length > 83 ||
+            script[0] !== OPCODES.OP_RETURN
+        )
+            return false;
+
+        const dataLength = script[1];
+        if (script.length !== dataLength + 2) return false;
+
+        logger?.debug(`abitrary data: ${script.toString("hex")}`);
 
         return true;
     }
