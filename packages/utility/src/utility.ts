@@ -34,7 +34,7 @@ export class owTool {
     static get hashString() { return ow.string.matches(/^[0-9A-Z-a-z]+$/); }
     static get numberString() { return ow.string.matches(/^[0-9]+$/); }
     static get xpubString() { return ow.string.matches(/^[1-9A-NP-Za-km-z]{111}$/); }
-    static get base58String() { return ow.string.is(x => !!Base58.decodeUnsafe(x)); }
+    static get base58String() { return ow.string.matches(/^[1-9A-HJ-NP-Za-km-z]$/).is(x => !!Base58.decodeUnsafe(x)); }
     static get base64String() { return ow.string.nonEmpty.matches(/^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$/); }
 };
 
