@@ -145,31 +145,29 @@ class PaymentBTC {
      * @param {Array<Buffer>} publickeys 
      * @returns 
      */
-    static p2ms(m: number, publickeys: Array<Buffer>): { redeem: Buffer, scriptPubicKey: Buffer } {
+    static p2ms(coin: CoinType, m: number, publickeys: Array<Buffer>): { address: string, scriptPubicKey: Buffer } {
         if (m <= 0) throw Error('Invalid paramter \"m\"');
 
         m = m + OPCODES.OP_INT_BASE;
         const n = publickeys.length + OPCODES.OP_INT_BASE;
-        const multi_pk = Buffer.concat(publickeys);
+        const multi_pk = Buffer.concat(
+            publickeys.map(pk => Buffer.from([pk.length, ...pk]))
+        );
 
-        const redeem = Buffer.concat([
+        const scriptPubicKey = Buffer.concat([
             Buffer.from([m]),
             multi_pk,
             Buffer.from([n]),
             Buffer.from([OPCODES.OP_CHECKMULTISIG])
         ]);
-        const redeemHash = Hash160(redeem);
+        logger?.info(`scriptPublickey: ${scriptPubicKey.toString('hex')}`);
+
+        const redeemHash = Hash160(scriptPubicKey);
         logger?.info(`redeem hash: ${redeemHash.toString('hex')}`);
 
-        const op = Buffer.from([OPCODES.OP_HASH160, 0x14]);
-        const check = Buffer.from([OPCODES.OP_EQUAL]);
-        const scriptPubicKey = Buffer.concat([
-            op,
-            redeemHash,
-            check
-        ]);
+        const { address } = this.p2sh(coin, redeemHash);
 
-        return { redeem, scriptPubicKey };
+        return { address, scriptPubicKey };
     }
 
     static p2tr(coin: CoinType, opt: { publickey?: Buffer, hash?: Buffer }) {

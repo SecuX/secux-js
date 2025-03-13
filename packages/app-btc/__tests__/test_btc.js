@@ -1,5 +1,6 @@
 const { SecuxBTC, CoinType, ScriptType } = require("@secux/app-btc");
 const { getDefaultScript } = require("@secux/app-btc/lib/utils");
+const { PaymentBTC } = require("@secux/app-btc/lib/payment");
 const btc = require("bitcoinjs-lib");
 const { validate } = require("multicoin-address-validator");
 const { txCheck, decode } = require("./decoder");
@@ -246,6 +247,46 @@ export function test_address(GetDevice, root) {
 
                     assert.equal(address, _.address);
                 }
+            });
+        });
+
+        describe("multisig address", () => {
+            const path1 = `m/0'/0'/${RandomNumber(100)}'/0/${RandomNumber(20)}`;
+            const path2 = `m/0'/0'/${RandomNumber(100)}'/0/${RandomNumber(20)}`;
+            const path3 = `m/0'/0'/${RandomNumber(100)}'/0/${RandomNumber(20)}`;
+            const publickey1 = root.derivePath(path1).publicKey;
+            const publickey2 = root.derivePath(path2).publicKey;
+            const publickey3 = root.derivePath(path3).publicKey;
+
+
+            let expected;
+            before(() => {
+                const multisig = btc.payments.p2ms({
+                    m: 2,
+                    pubkeys: [
+                        publickey1,
+                        publickey2,
+                        publickey3,
+                    ],
+                    network: btc.networks.bitcoin
+                });
+                expected = btc.payments.p2sh({ redeem: multisig }).address;
+            });
+
+            let address;
+            it("can generate multisig address", async () => {
+                address = PaymentBTC.p2ms(CoinType.BITCOIN, 2, [
+                    publickey1,
+                    publickey2,
+                    publickey3,
+                ]).address;
+            });
+
+            it("is valid address", () => {
+                const valid = validate(address, "BTC");
+
+                assert.equal(valid, true);
+                assert.equal(address.startsWith("3"), true);
             });
         });
     });
