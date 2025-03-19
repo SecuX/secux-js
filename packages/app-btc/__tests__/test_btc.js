@@ -1,4 +1,5 @@
 const { SecuxBTC, CoinType, ScriptType } = require("@secux/app-btc");
+const { SecuxPsbt } = require("@secux/app-btc/lib/psbt");
 const { getDefaultScript } = require("@secux/app-btc/lib/utils");
 const { PaymentBTC } = require("@secux/app-btc/lib/payment");
 const btc = require("bitcoinjs-lib");
@@ -7,6 +8,7 @@ const { txCheck, decode } = require("./decoder");
 const { ECPair } = require("ecpair");
 const { assert } = require("chai");
 const randomBytes = require("randombytes");
+const { sha256 } = require("bitcoinjs-lib/src/crypto");
 
 
 const BLACKBOX = false;
@@ -275,11 +277,13 @@ export function test_address(GetDevice, root) {
 
             let address;
             it("can generate multisig address", async () => {
-                address = PaymentBTC.p2ms(CoinType.BITCOIN, 2, [
+                const multisig = PaymentBTC.p2ms(2, [
                     publickey1,
                     publickey2,
                     publickey3,
-                ]).address;
+                ]);
+
+                address = PaymentBTC.p2sh(CoinType.BITCOIN, { redeemScript: multisig.scriptPubicKey }).address;
             });
 
             it("is valid address", () => {
@@ -401,7 +405,7 @@ export function test_tx(GetDevice, root) {
             const outputs = [
                 {
                     address: "19RJ1JTm7qkLeC5pCRPwsc7Ynx9eijZbvQ",
-                    satoshis: 100
+                    satoshis: 1000
                 },
                 {
                     script: ScriptType.P2SH_P2WPKH,
@@ -440,7 +444,7 @@ export function test_tx(GetDevice, root) {
             }).timeout(20000);
 
             it("check raw data of signed transaction", async () => {
-                outputs[1].satoshis = 35550;
+                outputs[1].satoshis = 34650;
                 const expected = getSignedTX(root, inputs, outputs);
 
                 txCheck(signed, expected, inputs, outputs);
@@ -590,6 +594,97 @@ export function test_tx(GetDevice, root) {
 
                 assert.equal(signed, expected);
             });
+        });
+
+        describe("multisig transaction", () => {
+            const m = 3;
+            const wallets = [];
+            for (let i = 0; i < m; i++) wallets.push(root.derivePath(`m/44'/1'/${i}'/0/0`)); 
+            const pubkeys = wallets.map(wallet => wallet.publicKey);
+            const input = {
+                hash: "f1edf3a89996ddd435187f252c81d63cef8f18a138be5e70492f2a8843226568",
+                vout: 0,
+                satoshis: 22534,
+            };
+            const output = 
+            {
+                address: "muwdNksvp8UkXnnEAZNdquS6pvuDMrae8P",
+                satoshis: 22300
+            };
+            
+
+            let dataForSig;
+            before(() => {
+                const network = btc.networks.testnet;
+                const p2ms = btc.payments.p2ms({ m, pubkeys, network });
+                const p2wsh = btc.payments.p2wsh({ redeem: p2ms, network });
+
+                const psbt = new btc.Psbt({ network })
+                    .addInput({
+                        hash: input.hash,
+                        index: input.vout,
+                        witnessScript: p2wsh.redeem.output,
+                        witnessUtxo: {
+                            script: p2wsh.output,
+                            value: input.satoshis
+                        }
+                    })
+                    .addOutput({
+                        address: output.address,
+                        value: output.satoshis,
+                    });
+
+                psbt.signInput(0, { 
+                    publicKey: pubkeys[0],
+                    sign: (hash) => {
+                        dataForSig = hash;
+                        return Buffer.allocUnsafe(64);
+                    }
+                });
+            });
+
+            let psbt;
+            it("can generate data for signing", () => {
+                psbt = new SecuxPsbt(CoinType.TESTNET);
+                psbt.initializeMultiSig(m, pubkeys);
+                psbt
+                    .addMultiSigInput(input)
+                    .AddOutput(output);
+
+                const sigData = psbt.getDataForSig(0);
+                console.log(sigData.toString("hex"));
+
+                const hash = sha256(sha256(psbt.getDataForSig(0)));
+                assert.equal(hash.toString("hex"), dataForSig.toString("hex"));
+            });
+
+            it.skip("can broadcast multisig transaction", async () => {
+                const tx = sha256(sha256(psbt.getDataForSig(0)));
+
+                for (let i = m - 1; i >= 0; i--) {
+                    const signature = wallets[i].sign(tx);
+                    psbt.submitSignature(0, {
+                        publickey: wallets[i].publicKey,
+                        signature,
+                    });
+                }
+
+                const txHex = psbt
+                    .finalizeAllInputs()
+                    .extractTransaction()
+                    .toHex();
+
+
+                const response = await fetch("https://api.blockchair.com/bitcoin/testnet/push/transaction", {
+                    method: "POST",
+                    headers: {
+                        "Accept": "application/json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ data: txHex })
+                });
+                console.log(await response.json());
+            }).timeout(60000);
         });
 
         if (BLACKBOX) {

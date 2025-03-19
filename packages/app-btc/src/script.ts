@@ -19,6 +19,7 @@ limitations under the License.
 
 const bip66 = require("bip66");
 import { OPCODES } from "./coindef";
+import * as scriptNumber from './script_number';
 import { Logger } from '@secux/utility';
 const ZERO = Buffer.alloc(1, 0);
 const logger = Logger?.child({ id: "script" });
@@ -130,6 +131,19 @@ export function encode(signature: Buffer, hashType: number) {
     const s = toDER(signature.slice(32, 64));
 
     return Buffer.concat([bip66.encode(r, s), hashTypeBuffer]);
+}
+
+export function toStack(chunks: any[]) {
+    if (Buffer.isBuffer(chunks)) chunks = decompile(chunks);
+
+    const stack = chunks.map(op => {
+        if (Buffer.isBuffer(op)) return op;
+        if (op === OPCODES.OP_0) return Buffer.allocUnsafe(0);
+
+        return scriptNumber.encode(op - OPCODES.OP_INT_BASE);
+    });
+    
+    return stack;
 }
 
 function toDER(x: Buffer) {

@@ -18,7 +18,6 @@ limitations under the License.
 
 
 import ow from 'ow';
-import { BigNumber } from "bignumber.js";
 import * as constants from "./coindef";
 import * as utils from "@secux/utility";
 export { OPCODES } from "./coindef";
@@ -32,6 +31,9 @@ export enum ScriptType {
     P2SH_P2WPKH,
     P2TR,
     P2WSH,
+    P2MS,
+    P2SH_P2MS,
+    P2WSH_P2MS,
     __LENGTH
 }
 
@@ -163,7 +165,7 @@ export function isOutuptScriptExtended(output: txOutputExtended): txOutputScript
         ow(output, ow_txOutputScriptExtened);
 
         return output;
-    } catch (error) { }
+    } catch (error) {}
 }
 
 export type TransactionObject = {

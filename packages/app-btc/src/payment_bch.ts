@@ -37,7 +37,7 @@ class PaymentBCH extends PaymentBTC {
     static p2pkh(coin: CoinType, opt: {
         publickey?: Buffer,
         hash?: Buffer
-    }): { address: string, scriptPublickey: Buffer, redeemHash: Buffer } {
+    }): { address: string, scriptPublickey: Buffer } {
         this.CoinSupported(coin);
         if (!opt.publickey && !opt.hash) throw Error('Invalid Parameters');
         if (opt.publickey && opt.hash) throw Error('Invalid Parameters');
@@ -54,20 +54,21 @@ class PaymentBCH extends PaymentBTC {
         const check = Buffer.from([OPCODES.OP_EQUALVERIFY, OPCODES.OP_CHECKSIG]);
         const scriptPublickey = Buffer.concat([op, pkHash, check]);
 
-        const redeemHash = Hash160(scriptPublickey);
-        logger?.info(`redeem hash: ${redeemHash.toString('hex')}`);
-
-        return { address, scriptPublickey, redeemHash };
+        return { address, scriptPublickey };
     }
 
     /**
      * Pay to Script Hash for BITCOINCASH
      * @param {CoinType} coin 
-     * @param {Buffer} redeemHash 
+     * @param {Buffer} opt [redeemScript | hashed redeem]
      * @returns 
      */
-    static p2sh(coin: CoinType, redeemHash: Buffer): { address: string, scriptPublickey: Buffer } {
+    static p2sh(coin: CoinType, opt: { redeemScript?: Buffer, hash?: Buffer }): { address: string, scriptPublickey: Buffer } {
         this.CoinSupported(coin);
+        if (!opt.redeemScript && !opt.hash) throw Error('Invalid Parameters');
+
+        const redeemHash = (opt.hash) ? opt.hash : Hash160(opt.redeemScript!);
+        logger?.info(`redeem hash: ${redeemHash.toString('hex')}`);
 
         let address = cashaddr.encode('bitcoincash', 'P2SH', redeemHash);
         address = address.split(':')[1];
@@ -96,7 +97,7 @@ class PaymentBCH extends PaymentBTC {
 
             switch (type) {
                 case "P2SH":
-                    return PaymentBCH.p2sh(coin, Buffer.from(hash)).scriptPublickey;
+                    return PaymentBCH.p2sh(coin, { hash: Buffer.from(hash) }).scriptPublickey;
 
                 default:
                     return PaymentBCH.p2pkh(coin, { hash: Buffer.from(hash) }).scriptPublickey;

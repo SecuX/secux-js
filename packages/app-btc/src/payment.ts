@@ -46,7 +46,7 @@ class PaymentBTC {
     static p2pkh(coin: CoinType, opt: {
         publickey?: Buffer,
         hash?: Buffer
-    }): { address: string, scriptPublickey: Buffer, redeemHash: Buffer } {
+    }): { address: string, scriptPublickey: Buffer } {
         this.CoinSupported(coin);
         if (!opt.publickey && !opt.hash) throw Error('Invalid Parameters');
         if (opt.publickey && opt.hash) throw Error('Invalid Parameters');
@@ -62,20 +62,21 @@ class PaymentBTC {
         const check = Buffer.from([OPCODES.OP_EQUALVERIFY, OPCODES.OP_CHECKSIG]);
         const scriptPublickey = Buffer.concat([op, pkHash, check]);
 
-        const redeemHash = Hash160(scriptPublickey);
-        logger?.info(`redeem hash: ${redeemHash.toString('hex')}`);
-
-        return { address, scriptPublickey, redeemHash };
+        return { address, scriptPublickey };
     }
 
     /**
      * Pay to Script Hash for BTC compatible coin
      * @param {CoinType} coin 
-     * @param {Buffer} redeemHash 
+     * @param {Buffer} opt [redeemScript | hashed redeem]
      * @returns 
      */
-    static p2sh(coin: CoinType, redeemHash: Buffer): { address: string, scriptPublickey: Buffer } {
+    static p2sh(coin: CoinType, opt: { redeemScript?: Buffer, hash?: Buffer }): { address: string, scriptPublickey: Buffer } {
         this.CoinSupported(coin);
+        if (!opt.redeemScript && !opt.hash) throw Error('Invalid Parameters');
+
+        const redeemHash = (opt.hash) ? opt.hash : Hash160(opt.redeemScript!);
+        logger?.info(`redeem hash: ${redeemHash.toString('hex')}`);
 
         const network = coinmap[coin];
         const address = this.bs58check.encode(redeemHash, Buffer.from([network.scriptHash]));
@@ -93,7 +94,7 @@ class PaymentBTC {
      * @param {Buffer} opt [publickey | hashed publickey]
      * @returns 
      */
-    static p2wpkh(coin: CoinType, opt: { publickey?: Buffer, hash?: Buffer }): { address: string, scriptPublickey: Buffer, redeemHash: Buffer } {
+    static p2wpkh(coin: CoinType, opt: { publickey?: Buffer, hash?: Buffer }): { address: string, scriptPublickey: Buffer } {
         this.CoinSupported(coin);
         if (!opt.publickey && !opt.hash) throw Error('Invalid Parameters');
         if (opt.publickey && opt.hash) throw Error('Invalid Parameters');
@@ -109,23 +110,20 @@ class PaymentBTC {
         const op = Buffer.from([OPCODES.OP_0, 0x14]);
         const scriptPublickey = Buffer.concat([op, pkHash]);
 
-        const redeemHash = Hash160(scriptPublickey);
-        logger?.info(`redeem hash: ${redeemHash.toString('hex')}`);
-
-        return { address, scriptPublickey, redeemHash };
+        return { address, scriptPublickey };
     }
 
     /**
      * Pay to Witness Script Hash
      * @param {CoinType} coin
-     * @param {Buffer} opt [witness | hashed redeem]
+     * @param {Buffer} opt [redeemScript | hashed redeem]
      * @returns 
      */
-    static p2wsh(coin: CoinType, opt: { witness?: Array<Buffer>, hash?: Buffer }): { address: string, scriptPublickey: Buffer, redeemHash: Buffer } {
+    static p2wsh(coin: CoinType, opt: { redeemScript?: Buffer, hash?: Buffer }): { address: string, scriptPublickey: Buffer } {
         this.CoinSupported(coin);
-        if (!opt.witness && !opt.hash) throw Error('Invalid Parameters');
+        if (!opt.redeemScript && !opt.hash) throw Error('Invalid Parameters');
 
-        const redeemHash = (opt.hash) ? opt.hash : Sha256(opt.witness![opt.witness!.length - 1]);
+        const redeemHash = (opt.hash) ? opt.hash : Sha256(opt.redeemScript!);
         logger?.info(`redeem hash: ${redeemHash.toString('hex')}`);
 
         let network = coinmap[coin];
@@ -136,7 +134,7 @@ class PaymentBTC {
         const op = Buffer.from([OPCODES.OP_0, 0x20]);
         const scriptPublickey = Buffer.concat([op, redeemHash]);
 
-        return { address, scriptPublickey, redeemHash };
+        return { address, scriptPublickey };
     }
 
     /**
@@ -145,8 +143,9 @@ class PaymentBTC {
      * @param {Array<Buffer>} publickeys 
      * @returns 
      */
-    static p2ms(coin: CoinType, m: number, publickeys: Array<Buffer>): { address: string, scriptPubicKey: Buffer } {
+    static p2ms(m: number, publickeys: Array<Buffer>): { scriptPubicKey: Buffer } {
         if (m <= 0) throw Error('Invalid paramter \"m\"');
+        if (m > 15) throw Error("you can use up to 15 public keys");
 
         m = m + OPCODES.OP_INT_BASE;
         const n = publickeys.length + OPCODES.OP_INT_BASE;
@@ -162,12 +161,7 @@ class PaymentBTC {
         ]);
         logger?.info(`scriptPublickey: ${scriptPubicKey.toString('hex')}`);
 
-        const redeemHash = Hash160(scriptPubicKey);
-        logger?.info(`redeem hash: ${redeemHash.toString('hex')}`);
-
-        const { address } = this.p2sh(coin, redeemHash);
-
-        return { address, scriptPubicKey };
+        return { scriptPubicKey };
     }
 
     static p2tr(coin: CoinType, opt: { publickey?: Buffer, hash?: Buffer }) {
@@ -238,7 +232,7 @@ class PaymentBTC {
             const prefix = hash160[0];
             const hash = hash160.slice(1);
 
-            if (prefix === network.scriptHash) return this.p2sh(coin, hash).scriptPublickey;
+            if (prefix === network.scriptHash) return this.p2sh(coin, { hash }).scriptPublickey;
             if (prefix === network.pubKeyHash) return this.p2pkh(coin, { hash }).scriptPublickey;
         }
         catch (error: any) {
@@ -259,7 +253,8 @@ class PaymentBTC {
 
             case ScriptType.P2SH:
             case ScriptType.P2SH_P2PKH:
-            case ScriptType.P2SH_P2WPKH: {
+            case ScriptType.P2SH_P2WPKH: 
+            case ScriptType.P2SH_P2MS: {
                 const redeemHash = script.slice(2, 2 + 20);
                 return this.bs58check.encode(redeemHash, Buffer.from([network.scriptHash]));
             }
@@ -288,6 +283,8 @@ class PaymentBTC {
         if (this.isP2WPKH(script)) return ScriptType.P2WPKH;
         if (this.isP2PKH(script)) return ScriptType.P2PKH;
         if (this.isP2TR(script)) return ScriptType.P2TR;
+        if (this.isP2MS(script)) return ScriptType.P2MS;
+
         if (this.isP2WSH(script)) return ScriptType.P2WSH;
         // can not distinguish P2SH_P2PKH or P2SH_P2WPKH
         if (this.isP2SH(script)) return ScriptType.P2SH;
@@ -350,6 +347,23 @@ class PaymentBTC {
             script[1] !== 0x20
         )
             return false;
+
+        return true;
+    }
+
+    static isP2MS(script: Buffer): boolean {
+        if (script[script.length - 1] !== OPCODES.OP_CHECKMULTISIG) return false;
+
+        const m = script[1] - OPCODES.OP_INT_BASE;
+        const n = script[script.length - 2] - OPCODES.OP_INT_BASE;
+        if (m > n) return false;
+
+        let validLength = 1;
+        for (let i = 0; i < n; i++) {
+            const keyLength = script[validLength];
+            validLength += keyLength + 1;
+        }
+        if (validLength + 2 !== script.length) return false;
 
         return true;
     }

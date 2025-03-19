@@ -17,7 +17,7 @@ limitations under the License.
 */
 
 
-import { PsbtInputExtended, PsbtOutputExtended, PsbtInput, PartialSig } from "bip174/src/lib/interfaces";
+import { PsbtInputExtended, PsbtOutputExtended, PsbtInput } from "bip174/src/lib/interfaces";
 import { checkForInput } from "bip174/src/lib/utils";
 const secp256k1 = require('secp256k1/elliptic');
 import { sha256 } from "hash.js";
@@ -55,6 +55,12 @@ class SecuxPsbt {
     #isRBF: boolean;
     #paths: Array<string> = [];
     #inScripts: { [index: number]: { type: ScriptType, scriptPubkey: Buffer } } = {};
+    #multiSig = {
+        m: 0,
+        publickeys: [] as Array<Buffer>,
+        scriptPublickey: undefined as Buffer | undefined,
+        witnessScript: undefined as Buffer | undefined,
+    };
 
 
     constructor(coin: CoinType, isRBF = false, data = new Psbtv2(new PsbtTransaction())) {
@@ -98,7 +104,7 @@ class SecuxPsbt {
                 mix2.redeemScript = p2pkh.scriptPublickey;
 
                 mix1.witnessUtxo = {
-                    script: this.#payment.p2sh(this.#coin, p2pkh.redeemHash).scriptPublickey,
+                    script: this.#payment.p2sh(this.#coin, { redeemScript: p2pkh.scriptPublickey }).scriptPublickey,
                     value
                 };
                 break;
@@ -108,7 +114,7 @@ class SecuxPsbt {
                 mix2.redeemScript = p2wpkh.scriptPublickey;
 
                 mix1.witnessUtxo = {
-                    script: this.#payment.p2sh(this.#coin, p2wpkh.redeemHash).scriptPublickey,
+                    script: this.#payment.p2sh(this.#coin, { redeemScript: p2wpkh.scriptPublickey }).scriptPublickey,
                     value
                 };
                 break;
@@ -176,6 +182,75 @@ class SecuxPsbt {
         return this;
     }
 
+    initializeMultiSig(m: number, publickeys: Array<string | Buffer>): string {
+        if (![CoinType.BITCOIN, CoinType.TESTNET, CoinType.REGTEST].includes(this.#coin)) {
+            throw Error(`unsupported chain: ${CoinType[this.#coin]}`);
+        }
+
+        this.#multiSig.m = m;
+        const pks = publickeys.map(pk => getPublickey(pk));
+        this.#multiSig.publickeys = pks;
+
+        const p2ms = this.#payment.p2ms(m, pks);
+        const redeemScript = p2ms.scriptPubicKey;
+        const p2wsh = this.#payment.p2wsh(this.#coin, { redeemScript });
+        this.#multiSig.scriptPublickey = p2wsh.scriptPublickey;
+        this.#multiSig.witnessScript = redeemScript;
+
+        return p2wsh.address;
+    }
+
+    addMultiSigInput(input: {
+        hash: string,
+        vout: number,
+        satoshis: number | string,
+        txHex?: string, 
+    }) {
+        const mix1: any = {};
+        const mix2: any = {};
+        const value = new BigNumber(input.satoshis).toNumber();
+
+        mix2.witnessScript = this.#multiSig.witnessScript;
+
+        mix1.witnessUtxo = {
+            script: this.#multiSig.scriptPublickey,
+            value
+        };
+
+        // check input
+        if (input.txHex) {
+            const tx = Transaction.fromBuffer(Buffer.from(input.txHex, "hex"));
+
+            if (getSerializer(this.#coin).getId(tx) !== input.hash) {
+                throw Error(
+                    `UTXO hash for input #${this.#data.inputs.length} doesn't match the hash specified in the prevout`,
+                );
+            }
+
+            const out = tx.outs[input.vout];
+            if (!new BigNumber(out.value).eq(input.satoshis)) {
+                throw Error(
+                    `UTXO value for input #${this.#data.inputs.length} doesn't match the value specified in the prevout`,
+                );
+            }
+
+            if (!out.script.equals(mix1.witnessUtxo.script)) {
+                logger?.warn(`Input script generation error: ${out.script.toString("hex")}, got "${mix1.witnessUtxo.script}"`);
+            }
+        }
+
+        const data = {
+            hash: input.hash,
+            index: input.vout,
+            sequence: this.#isRBF ? 0xfffffffd : undefined,
+            ...mix1,
+            ...mix2
+        };
+        this.#data.addInput(data);
+
+        return this;
+    }
+
     AddOutput(output: txOutputExtended): SecuxPsbt {
         let out, script, path: any;
         let value = new BigNumber(output.satoshis).toNumber();
@@ -184,44 +259,48 @@ class SecuxPsbt {
             path = out.path;
 
             const scriptType = out.script ?? getDefaultScript(path);
-            let redeemHash, p2sh;
             switch (scriptType) {
-                case ScriptType.P2SH_P2WPKH:
+                case ScriptType.P2SH_P2WPKH: {
                     if (!out.path.startsWith("m/49'/")) throw Error("P2SH(...) should use m/49' path");
 
-                    redeemHash = this.#payment.p2wpkh(this.#coin, { publickey: pk }).redeemHash;
-                    p2sh = this.#payment.p2sh(this.#coin, redeemHash);
+                    const p2wpkh = this.#payment.p2wpkh(this.#coin, { publickey: pk });
+                    const p2sh = this.#payment.p2sh(this.#coin, { redeemScript: p2wpkh.scriptPublickey });
                     script = p2sh.scriptPublickey;
                     break;
+                }
 
-                case ScriptType.P2SH_P2PKH:
+                case ScriptType.P2SH_P2PKH: {
                     if (!out.path.startsWith("m/49'/")) throw Error("P2SH(...) should use m/49' path");
 
-                    redeemHash = this.#payment.p2pkh(this.#coin, { publickey: pk }).redeemHash;
-                    p2sh = this.#payment.p2sh(this.#coin, redeemHash);
+                    const p2pkh = this.#payment.p2pkh(this.#coin, { publickey: pk });
+                    const p2sh = this.#payment.p2sh(this.#coin, { redeemScript: p2pkh.scriptPublickey });
                     script = p2sh.scriptPublickey;
                     break;
+                }
 
-                case ScriptType.P2PKH:
+                case ScriptType.P2PKH: {
                     if (!out.path.startsWith("m/44'/")) throw Error("P2PKH should use m/44' path");
 
                     const p2pkh = this.#payment.p2pkh(this.#coin, { publickey: pk });
                     script = p2pkh.scriptPublickey;
                     break;
+                }
 
-                case ScriptType.P2WPKH:
+                case ScriptType.P2WPKH: {
                     if (!out.path.startsWith("m/84'/")) throw Error("P2WPKH should use m/84' path");
-
+                    
                     const p2wpkh = this.#payment.p2wpkh(this.#coin, { publickey: pk });
                     script = p2wpkh.scriptPublickey;
                     break;
+                }
 
-                case ScriptType.P2TR:
+                case ScriptType.P2TR: {
                     if (!out.path.startsWith("m/86'/")) throw Error("P2TR should use m/86' path");
 
                     const p2tr = this.#payment.p2tr(this.#coin, { publickey: pk });
                     script = p2tr.scriptPublickey;
                     break;
+                }
 
                 default:
                     throw Error(`ArgumentError: Invalid ScriptType of output#${this.#data.outputs.length}, got "${ScriptType[scriptType]}"`);
@@ -272,7 +351,7 @@ class SecuxPsbt {
         ]);
 
         const txs = this.#data.inputs.map((_, i) => {
-            const data = this.#getDataForSig(i);
+            const data = this.getDataForSig(i);
             logger?.debug(`tx data [${i}]: ${data.toString("hex")}`);
 
             if (data.length + MAX_HEAD_SIZE > ONESIGN_THRESHOLD) {
@@ -333,7 +412,7 @@ class SecuxPsbt {
                 got ${signatures.length} signatures and ${publickeys.length} publickeys`);
 
         for (let i = 0; i < this.#data.inputs.length; i++) {
-            const data = this.#getDataForSig(i);
+            const data = this.getDataForSig(i);
 
             if (this.#fetchInputScript(i).type !== ScriptType.P2TR) {
                 const hash = (this.#coin === CoinType.GROESTL) ? Buffer.from(sha256().update(data).digest())
@@ -373,6 +452,21 @@ class SecuxPsbt {
         return this;
     }
 
+    submitSignature(index: number, data: { publickey: Buffer, signature: Buffer }): SecuxPsbt {
+        const input = this.#data.inputs[index];
+        if (!input.partialSig) input.partialSig = [];
+
+        const sighashType = input.sighashType ?? Transaction.SIGHASH_ALL;
+        this.#data.updateInput(index, {
+            partialSig: [{
+                pubkey: data.publickey,
+                signature: Script.encode(data.signature, sighashType),
+            }]
+        })
+
+        return this;
+    }
+
     finalizeAllInputs(): SecuxPsbt {
         if (this.#data.inputs.length < 1) throw Error("utxo input cannot be empty");
 
@@ -384,7 +478,7 @@ class SecuxPsbt {
             if (!script) throw new Error(`No script found for input #${idx}`);
             this.#checkSighashType(input, scriptType);
 
-            const { finalScriptSig, finalScriptWitness } = prepareFinalScripts(scriptType!, input.partialSig!);
+            const { finalScriptSig, finalScriptWitness } = prepareFinalScripts(scriptType!, input);
 
             if (finalScriptSig) this.#data.updateInput(idx, { finalScriptSig });
             if (finalScriptWitness) this.#data.updateInput(idx, { finalScriptWitness });
@@ -429,7 +523,7 @@ class SecuxPsbt {
         return obj;
     }
 
-    #getDataForSig(inputIndex: number) {
+    getDataForSig(inputIndex: number): Buffer {
         const txIn = this.#data.inputs[inputIndex];
         const unsignedTx: Transaction = this.#tx;
         let sighashType = txIn.sighashType ?? Transaction.SIGHASH_ALL;
@@ -442,9 +536,7 @@ class SecuxPsbt {
         let data;
         switch (type) {
             case ScriptType.P2WPKH:
-            case ScriptType.P2SH:
             case ScriptType.P2SH_P2WPKH:
-            case ScriptType.P2SH_P2PKH:
                 logger?.debug(ScriptType[type]);
                 // P2WPKH uses the P2PKH template for prevoutScript when signing
                 const signingScript = getPayment(this.#coin).p2pkh(this.#coin, { hash: scriptPubkey.slice(2) }).scriptPublickey;
@@ -457,8 +549,22 @@ class SecuxPsbt {
                 );
                 break;
 
+            case ScriptType.P2WSH:
+            case ScriptType.P2WSH_P2MS:
+                logger?.debug(ScriptType[type]);
+
+                data = serializer.dataForWitnessV0(
+                    unsignedTx,
+                    inputIndex,
+                    txIn.witnessScript!,
+                    prevout.value,
+                    sighashType,
+                );
+                break;
+
             case ScriptType.P2TR:
                 logger?.debug("p2tr");
+
                 sighashType = txIn.sighashType ?? Transaction.SIGHASH_DEFAULT;
                 data = serializer.dataForWitnessV1(
                     unsignedTx,
@@ -593,6 +699,7 @@ function getMeaningfulScript(
         case ScriptType.P2SH:
         case ScriptType.P2SH_P2PKH:
         case ScriptType.P2SH_P2WPKH:
+        case ScriptType.P2SH_P2MS:
             if (!redeemScript) throw Error("scriptPubkey is P2SH but redeemScript missing");
             meaningfulScript = redeemScript;
             break;
@@ -614,6 +721,15 @@ function getScriptFromInput(input: PsbtInput, coin: CoinType) {
 
     if (input.witnessScript) {
         script = input.witnessScript;
+        scriptType = payment.classify(script);
+        switch (scriptType) {
+            case ScriptType.P2MS:
+                scriptType = ScriptType.P2WSH_P2MS;
+                break;
+
+            default:
+                throw Error(`unknown script: ${script.toString("hex")}`);
+        }
     }
     else if (input.redeemScript) {
         script = input.redeemScript;
@@ -626,6 +742,13 @@ function getScriptFromInput(input: PsbtInput, coin: CoinType) {
             case ScriptType.P2WPKH:
                 scriptType = ScriptType.P2SH_P2WPKH;
                 break;
+
+            case ScriptType.P2MS:
+                scriptType = ScriptType.P2SH_P2MS;
+                break;
+
+            default:
+                throw Error(`unknown script: ${script.toString("hex")}`);
         }
     }
     else {
@@ -639,11 +762,11 @@ function getScriptFromInput(input: PsbtInput, coin: CoinType) {
     }
 }
 
-function prepareFinalScripts(scriptType: ScriptType, partialSig: PartialSig[]) {
+function prepareFinalScripts(scriptType: ScriptType, input: PsbtInput) {
     let finalScriptSig;
     let finalScriptWitness;
 
-    const { signature, pubkey } = partialSig[0];
+    const { signature, pubkey } = input.partialSig![0];
     switch (scriptType) {
         case ScriptType.P2PKH:
             finalScriptSig = Script.compile([signature, pubkey]);
@@ -683,9 +806,30 @@ function prepareFinalScripts(scriptType: ScriptType, partialSig: PartialSig[]) {
             })();
             break;
 
+        case ScriptType.P2SH_P2MS:
+            finalScriptSig = (() => {
+                const signatures = getSortedSignatures(input);
+                const _input = Script.compile([OPCODES.OP_0 as any].concat(signatures))!;
+
+                return Script.compile(
+                    ([] as (Buffer | number)[]).concat(
+                        Script.decompile(_input),
+                        input.redeemScript!
+                    )
+                );
+            })();
+            break;
+
         case ScriptType.P2WPKH:
             finalScriptWitness = witnessStackToScriptWitness([signature, pubkey]);
             break;
+
+        case ScriptType.P2WSH_P2MS: {
+            const signatures = getSortedSignatures(input);
+            const scriptSig = Script.toStack([OPCODES.OP_0, ...signatures]);
+            finalScriptWitness = witnessStackToScriptWitness([...scriptSig, input.witnessScript!]);
+            break;
+        }
 
         case ScriptType.P2TR:
             finalScriptWitness = signature;
@@ -696,6 +840,25 @@ function prepareFinalScripts(scriptType: ScriptType, partialSig: PartialSig[]) {
         finalScriptSig,
         finalScriptWitness
     };
+}
+
+function getSortedSignatures(input: PsbtInput) {
+    // m {publickeys} n op_checkmultisig
+    const chunk = Script.decompile(input.witnessScript ?? input.redeemScript!);
+    const m = chunk[0] as number - OPCODES.OP_INT_BASE;
+    const sigData = input.partialSig!;
+    const signatures: Buffer[] = [];
+    const orderedPublickeys = chunk.slice(1, -2) as Buffer[];
+    for (const pk of orderedPublickeys) {
+        const sig = sigData.find(sig => sig.pubkey.equals(pk));
+        if (sig) {
+            signatures.push(sig.signature);
+        }
+    }
+
+    if (signatures.length < m) throw Error(`${m} signatures needed, but got ${sigData.length}`);
+
+    return signatures;
 }
 
 

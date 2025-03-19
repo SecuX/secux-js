@@ -67,11 +67,11 @@ export class SecuxBTC {
         switch (script) {
             case ScriptType.P2SH_P2WPKH:
                 const p2wpkh = payment.p2wpkh(coin, { publickey: compressed });
-                return payment.p2sh(coin, p2wpkh.redeemHash).address;
+                return payment.p2sh(coin, { redeemScript: p2wpkh.scriptPublickey }).address;
 
             case ScriptType.P2SH_P2PKH:
                 const p2pkh = payment.p2pkh(coin, { publickey: compressed });
-                return payment.p2sh(coin, p2pkh.redeemHash).address;
+                return payment.p2sh(coin, { redeemScript: p2pkh.scriptPublickey }).address;
 
             case ScriptType.P2PKH:
                 return payment.p2pkh(coin, { publickey: compressed }).address;
