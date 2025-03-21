@@ -46,6 +46,7 @@ module.exports = {
             process: require.resolve('process'),
             crypto: require.resolve('crypto-browserify'),
             stream: require.resolve('stream-browserify'),
+            vm: require.resolve('vm-browserify'),
             fs: false,
             tls: false,
             net: false,

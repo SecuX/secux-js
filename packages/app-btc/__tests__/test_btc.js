@@ -658,6 +658,14 @@ export function test_tx(GetDevice, root) {
                 assert.equal(hash.toString("hex"), dataForSig.toString("hex"));
             });
 
+            it("can sign from psbt", () => {
+                const serialized = psbt.toBuffer();
+                const new_psbt = SecuxPsbt.FromBuffer(serialized, CoinType.TESTNET);
+
+                const tx = sha256(sha256(new_psbt.getDataForSig(0)));
+                assert.equal(tx.toString("hex"), dataForSig.toString("hex"));
+            });
+
             it.skip("can broadcast multisig transaction", async () => {
                 const tx = sha256(sha256(psbt.getDataForSig(0)));
 

@@ -82,6 +82,10 @@ class SecuxPsbt {
         return psbt;
     }
 
+    toBuffer(): Buffer {
+        return this.#data.toBuffer();
+    }
+
     AddInput(input: txInput): SecuxPsbt {
         if (!isSupportedCoin(input.path)) throw Error(`ArgumentError: unsupport bip32 path, got "${input.path}"`);
 
@@ -182,7 +186,7 @@ class SecuxPsbt {
         return this;
     }
 
-    initializeMultiSig(m: number, publickeys: Array<string | Buffer>): string {
+    initializeMultiSig(m: number, publickeys: Array<string | Buffer>) {
         if (![CoinType.BITCOIN, CoinType.TESTNET, CoinType.REGTEST].includes(this.#coin)) {
             throw Error(`unsupported chain: ${CoinType[this.#coin]}`);
         }
@@ -197,7 +201,10 @@ class SecuxPsbt {
         this.#multiSig.scriptPublickey = p2wsh.scriptPublickey;
         this.#multiSig.witnessScript = redeemScript;
 
-        return p2wsh.address;
+        return {
+            address: p2wsh.address,
+            redeemScript: redeemScript.toString("hex"),
+        }
     }
 
     addMultiSigInput(input: {
@@ -501,6 +508,9 @@ class SecuxPsbt {
         return tx;
     }
 
+    virtualSize(): number {
+        return this.#tx.virtualSize();
+    }
 
     #fetchInputScript(index: number) {
         if (this.#inScripts[index]) return this.#inScripts[index];
