@@ -20,7 +20,7 @@ limitations under the License.
 import { Base58 } from "@secux/utility/lib/bs58";
 import { SecuxSOL } from "./app-sol";
 import { StakeInstruction } from "./instruction";
-import { Base58String, BuiltinInstruction, InstructionType, ow_address } from "./interface";
+import { Base58String, BuiltinInstruction, HexString, InstructionType, ow_address } from "./interface";
 import ow from "ow";
 import { Logger } from "@secux/utility";
 const logger = Logger?.child({ id: "action" });
@@ -37,7 +37,8 @@ export class Action {
         amount: string | number,
         mint: Base58String,
         decimal: number,
-        createAccount?: boolean
+        createAccount?: boolean,
+        program?: HexString,
     }): Array<BuiltinInstruction> {
         ow(params, ow.object.partialShape({
             to: ow_address,
@@ -56,7 +57,8 @@ export class Action {
                     owner: params.owner,
                     amount: params.amount,
                     mint: params.mint,
-                    decimal: params.decimal
+                    decimal: params.decimal,
+                    program: params.program,
                 }
             },
         ];
@@ -68,7 +70,8 @@ export class Action {
                     params: {
                         payer: params.owner,
                         owner: params.to,
-                        mint: params.mint
+                        mint: params.mint,
+                        program: params.program,
                     }
                 }
             );
@@ -178,7 +181,7 @@ function isAccount(str: string): boolean {
     try {
         ow(str, ow_address);
         return true;
-    } catch (error) { }
+    } catch (error) {}
 
     return false;
 }

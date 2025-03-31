@@ -1,5 +1,5 @@
 module.exports = {
-    entry: "./src/app-sol.ts",
+    entry: "./src/index.ts",
     output: {
         path: `${__dirname}/dist`,
         filename: 'index.js',

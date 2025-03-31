@@ -173,12 +173,19 @@ export class ComputeBudgetInstruction {
 export class TokenInstruction {
     static readonly TOKEN_PROGRAM_ID: HexString = "06ddf6e1d765a193d9cbe146ceeb79ac1cb485ed5f5b37913a8cf5857eff00a9";
     static readonly ASSOCIATED_TOKEN_PROGRAM_ID: HexString = "8c97258f4e2489f1bb3d1029148e0d830b5a1399daff1084048e7bd8dbe9f859";
+    static readonly TOKEN2022_PROGRAM_ID: HexString = "06ddf6e1ee758fde18425dbce46ccddab61afc4d83b90d27febdf928d8a18bfc";
 
-    static createAssociatedTokenAccount(params: { payer: Base58String, owner: Base58String, mint: Base58String }): Instruction {
+    static createAssociatedTokenAccount(params: { 
+        payer: Base58String, 
+        owner: Base58String, 
+        mint: Base58String, 
+        program?: HexString,
+    }): Instruction {
         ow(params, ow.object.partialShape({
             payer: ow_address,
             owner: ow_address,
-            mint: ow_address
+            mint: ow_address,
+            program: ow.any(ow.undefined, owTool.hexString)
         }));
 
         const pk = toPublickey(params.owner);
@@ -190,7 +197,7 @@ export class TokenInstruction {
             { publickey: pk, isSigner: false, isWritable: false },
             { publickey: toPublickey(params.mint), isSigner: false, isWritable: false },
             { publickey: SystemInstruction.programId, isSigner: false, isWritable: false },
-            { publickey: TokenInstruction.TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+            { publickey: params.program ?? TokenInstruction.TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
             { publickey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
         ];
 
@@ -205,13 +212,15 @@ export class TokenInstruction {
         from: Base58String,
         to: Base58String,
         owner: Base58String,
-        amount: string | number
+        amount: string | number,
+        program?: HexString,
     }): Instruction {
         ow(params, ow.object.partialShape({
             from: ow_address,
             to: ow_address,
             owner: ow_address,
-            amount: ow.any(owTool.numberString, ow.number.positive)
+            amount: ow.any(owTool.numberString, ow.number.positive),
+            program: ow.any(ow.undefined, owTool.hexString)
         }));
 
         const accounts = [
@@ -226,16 +235,17 @@ export class TokenInstruction {
         ]);
 
         return {
-            programId: TokenInstruction.TOKEN_PROGRAM_ID,
+            programId: params.program ?? TokenInstruction.TOKEN_PROGRAM_ID,
             accounts,
             data
         }
     }
 
-    static closeAccount(params: { account: Base58String, owner: Base58String }): Instruction {
+    static closeAccount(params: { account: Base58String, owner: Base58String, program?: HexString }): Instruction {
         ow(params, ow.object.partialShape({
             account: ow_address,
-            owner: ow_address
+            owner: ow_address,
+            program: ow.any(ow.undefined, owTool.hexString)
         }));
 
         const accounts = [
@@ -245,7 +255,7 @@ export class TokenInstruction {
         ];
 
         return {
-            programId: TokenInstruction.TOKEN_PROGRAM_ID,
+            programId: params.program ?? TokenInstruction.TOKEN_PROGRAM_ID,
             accounts,
             data: Buffer.from([0x09])
         }
@@ -257,7 +267,8 @@ export class TokenInstruction {
         owner: Base58String,
         mint: Base58String,
         decimal: number,
-        amount: string | number
+        amount: string | number,
+        program?: HexString,
     }): Instruction {
         ow(params, ow.object.partialShape({
             from: ow_address,
@@ -265,7 +276,8 @@ export class TokenInstruction {
             owner: ow_address,
             mint: ow_address,
             decimal: ow.number.uint8,
-            amount: ow.any(owTool.numberString, ow.number.positive)
+            amount: ow.any(owTool.numberString, ow.number.positive),
+            program: ow.any(ow.undefined, owTool.hexString)
         }));
 
         const accounts = [
@@ -282,7 +294,7 @@ export class TokenInstruction {
         ]);
 
         return {
-            programId: TokenInstruction.TOKEN_PROGRAM_ID,
+            programId: params.program ?? TokenInstruction.TOKEN_PROGRAM_ID,
             accounts,
             data
         }

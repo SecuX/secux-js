@@ -1,6 +1,6 @@
 {
   "name": "@secux/app-sol",
-  "version": "3.0.11",
+  "version": "3.1.0",
   "description": "SecuX Hardware Wallet SOL API",
   "keywords": [
     "secux",
@@ -13,7 +13,7 @@
   "homepage": "https://github.com/SecuX/secux-js/tree/master/packages/app-sol",
   "author": "SecuX Technology Inc.",
   "license": "Apache-2.0",
-  "main": "lib/app-sol.js",
+  "main": "lib/index.js",
   "directories": {
     "lib": "lib",
     "test": "__tests__"
