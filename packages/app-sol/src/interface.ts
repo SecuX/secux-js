@@ -35,11 +35,13 @@ export type Base58String = string;
 export type HexString = string;
 
 export type ATAOption = {
-    mintAccount: Base58String
+    mintAccount: Base58String,
+    program?: HexString,
 };
 
 export const ow_ATAOption = ow.object.exactShape({
-    mintAccount: ow_address
+    mintAccount: ow_address,
+    program: ow.any(ow.undefined, owTool.hexString),
 });
 
 export type SeedOption = {

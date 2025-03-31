@@ -73,7 +73,7 @@ export class SecuxSOL {
 
         for (let nonce = 255; nonce > 0; nonce--) {
             try {
-                const programId = Buffer.from(TokenInstruction.TOKEN_PROGRAM_ID, "hex");
+                const programId = Buffer.from(option.program ?? TokenInstruction.TOKEN_PROGRAM_ID, "hex");
                 const associatedProgramId = Buffer.from(TokenInstruction.ASSOCIATED_TOKEN_PROGRAM_ID, "hex");
                 const mint = Base58.decode(option.mintAccount);
 

@@ -19,7 +19,7 @@ limitations under the License.
 
 import { Base58 } from "@secux/utility/lib/bs58";
 import { SecuxSOL } from "./app-sol";
-import { StakeInstruction } from "./instruction";
+import { TokenInstruction, StakeInstruction } from "./instruction";
 import { Base58String, BuiltinInstruction, HexString, InstructionType, ow_address } from "./interface";
 import ow from "ow";
 import { Logger } from "@secux/utility";
@@ -47,7 +47,12 @@ export class Action {
             createAccount: ow.optional.boolean
         }));
 
-        const from = params.from ?? SecuxSOL.addressConvert(Base58.decode(params.owner), { mintAccount: params.mint });
+        const publickey = Base58.decode(params.owner);
+        const from = params.from ?? 
+            SecuxSOL.addressConvert(publickey, {
+                mintAccount: params.mint,
+                program: params.program ?? TokenInstruction.TOKEN_PROGRAM_ID,
+            });
         const instructions: Array<BuiltinInstruction> = [
             {
                 type: InstructionType.TransferTokenChecked,
