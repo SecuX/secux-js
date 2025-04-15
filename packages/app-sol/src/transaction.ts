@@ -76,8 +76,8 @@ export class Transaction {
         const isLegacy = prefix === (prefix & VERSION_PREFIX_MASK);
 
         const tx = isLegacy ? new Transaction('') : new TransactionV0('');
-        tx.deserializeMessage(data);
-        tx.#cache = Buffer.from([...data]);
+        const byteArray = tx.deserializeMessage(data);
+        tx.#cache = data.slice(0, data.length - byteArray.length);
 
         return tx;
     }
