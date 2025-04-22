@@ -1,6 +1,6 @@
 {
   "name": "@secux/transport-signer",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "SecuX software signer for communication layer",
   "keywords": [
     "secux",

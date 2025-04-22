@@ -18,7 +18,7 @@ limitations under the License.
 
 
 import { ITransport } from "@secux/transport";
-import { decodePathBuffer, splitPath } from "@secux/utility";
+import { decodePathBuffer, owTool, splitPath } from "@secux/utility";
 import * as CMD from "@secux/protocol-transaction/lib/command";
 import { EllipticCurve, ow_EllipticCurve } from "@secux/protocol-transaction/lib/interface";
 import * as bip39 from "bip39";
@@ -26,6 +26,7 @@ import * as varuint from "varuint-bitcoin";
 import { BIP32ED25519, HDKey, HDKeyED25519, IHDKey } from "./hdkey";
 import { hashmap, taggedHash } from "./hashdef";
 import ow from "ow";
+import { communicationData, getBuffer, toCommunicationData } from "@secux/utility/lib/communication";
 export { SecuxVirtualTransport };
 
 
@@ -41,18 +42,19 @@ class SecuxVirtualTransport extends ITransport {
         this.#seed_ada = BIP32ED25519.generateSeed(mnemonic);
     }
 
-    async Connect(): Promise<void> { }
+    async Connect(): Promise<void> {}
 
-    async Disconnect(): Promise<void> { }
+    async Disconnect(): Promise<void> {}
 
     get Exchange() {
         return this.#Exchange;
     }
 
-    async #Exchange(data: Buffer): Promise<Buffer> {
-        ow(data, ow.buffer);
+    async #Exchange(data: communicationData): Promise<any> {
+        ow(data, ow.any(ow.buffer, owTool.base64String));
 
 
+        data = getBuffer(data);
         const command = data.slice(0, 2);
         const len = data.readUInt16LE(4);
         const raw = data.slice(6, 6 + len);
@@ -89,7 +91,7 @@ class SecuxVirtualTransport extends ITransport {
         throw Error("unsopported command");
     }
 
-    #getPublickey(data: Buffer, curve: EllipticCurve): Buffer {
+    #getPublickey(data: Buffer, curve: EllipticCurve): communicationData {
         ow(curve, ow_EllipticCurve);
 
 
@@ -113,7 +115,7 @@ class SecuxVirtualTransport extends ITransport {
         throw Error(`ArgumentError: unsupported curve, got "${EllipticCurve[curve]}"`);
     }
 
-    #getXPublickey(data: Buffer, curve: EllipticCurve): Buffer {
+    #getXPublickey(data: Buffer, curve: EllipticCurve): communicationData {
         const path = decodePathBuffer(data);
 
         if (curve === EllipticCurve.ED25519_ADA) {
@@ -220,18 +222,19 @@ class SecuxVirtualTransport extends ITransport {
 }
 
 
-function mimicResponse(data: Buffer): Buffer {
+function mimicResponse(data: Buffer): communicationData {
     const lenBuf = Buffer.alloc(2);
     lenBuf.writeUInt16LE(data.length);
     const statBuf = Buffer.alloc(2);
     statBuf.writeUInt16BE(0x9000);
 
-    return Buffer.concat([
+    const response = Buffer.concat([
         lenBuf,
         data,
         statBuf,
         Buffer.alloc(2)
     ]);
+    return toCommunicationData(response);
 }
 
 function parseBTC(buffer: Buffer): Buffer {
