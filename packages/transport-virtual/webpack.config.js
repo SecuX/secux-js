@@ -1,7 +1,6 @@
 const webpack = require('webpack');
 
 const nodepolyfillPlugin = new webpack.ProvidePlugin({
-    process: 'process/browser',
     Buffer: ['buffer', 'Buffer'],
 });
 
@@ -39,7 +38,8 @@ module.exports = {
         "@secux/protocol-transaction": "@secux/protocol-transaction",
         "@secux/transport": "@secux/transport",
         "@secux/utility": "@secux/utility",
-        "ow": "ow"
+        "ow": "ow",
+        "process": "process",
     },
     experiments: {
         asyncWebAssembly: true,
