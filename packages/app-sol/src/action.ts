@@ -21,6 +21,7 @@ import { Base58 } from "@secux/utility/lib/bs58";
 import { SecuxSOL } from "./app-sol";
 import { TokenInstruction, StakeInstruction } from "./instruction";
 import { Base58String, BuiltinInstruction, HexString, InstructionType, ow_address } from "./interface";
+import { isOnCurve, toPublickey } from "./utils";
 import ow from "ow";
 import { Logger } from "@secux/utility";
 const logger = Logger?.child({ id: "action" });
@@ -48,22 +49,33 @@ export class Action {
         }));
 
         const publickey = Base58.decode(params.owner);
+        const _program = params.program ?? TokenInstruction.TOKEN_PROGRAM_ID;
         const from = params.from ?? 
             SecuxSOL.addressConvert(publickey, {
                 mintAccount: params.mint,
-                program: params.program ?? TokenInstruction.TOKEN_PROGRAM_ID,
+                program: _program,
             });
+
+        let ata = params.to;
+        // convert address to ata account
+        if (isOnCurve(Buffer.from(toPublickey(params.to), "hex"))) {
+            ata = SecuxSOL.addressConvert(Base58.decode(params.to), { 
+                mintAccount: params.mint,
+                program: _program
+            });
+        }
+
         const instructions: Array<BuiltinInstruction> = [
             {
                 type: InstructionType.TransferTokenChecked,
                 params: {
                     from,
-                    to: params.to,
+                    to: ata,
                     owner: params.owner,
                     amount: params.amount,
                     mint: params.mint,
                     decimal: params.decimal,
-                    program: params.program,
+                    program: _program,
                 }
             },
         ];
@@ -76,13 +88,10 @@ export class Action {
                         payer: params.owner,
                         owner: params.to,
                         mint: params.mint,
-                        program: params.program,
+                        program: _program,
                     }
                 }
             );
-
-            const ata = SecuxSOL.addressConvert(Base58.decode(params.to), { mintAccount: params.mint });
-            instructions[1].params.to = ata;
         }
 
         return instructions;

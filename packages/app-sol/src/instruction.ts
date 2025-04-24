@@ -189,7 +189,10 @@ export class TokenInstruction {
         }));
 
         const pk = toPublickey(params.owner);
-        const associatedTokenAccount = SecuxSOL.addressConvert(pk, { mintAccount: params.mint });
+        const associatedTokenAccount = SecuxSOL.addressConvert(pk, { 
+            mintAccount: params.mint,
+            program: params.program ?? TokenInstruction.TOKEN_PROGRAM_ID,
+        });
 
         const accounts = [
             { publickey: toPublickey(params.payer), isSigner: true, isWritable: true },
