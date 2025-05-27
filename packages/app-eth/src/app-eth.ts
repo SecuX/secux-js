@@ -45,9 +45,9 @@ const mcu = {
  */
 @staticImplements<IPlugin>()
 class SecuxETH {
-    static readonly ERC20 = ERC20;
-    static readonly ERC721 = ERC721;
-    static readonly ERC1155 = ERC1155;
+    static get ERC20() { return ERC20; }
+    static get ERC721() { return ERC721; }
+    static get ERC1155() { return ERC1155; }
 
 
     /**
