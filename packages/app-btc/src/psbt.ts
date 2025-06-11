@@ -484,7 +484,6 @@ class SecuxPsbt {
 
             if (!script) throw new Error(`No script found for input #${idx}`);
             this.#checkSighashType(input, scriptType);
-
             const { finalScriptSig, finalScriptWitness } = prepareFinalScripts(scriptType!, input);
 
             if (finalScriptSig) this.#data.updateInput(idx, { finalScriptSig });
@@ -509,7 +508,10 @@ class SecuxPsbt {
     }
 
     virtualSize(): number {
-        return this.#tx.virtualSize();
+        const tx = this.#tx.clone();
+        this.#data.inputs.forEach((input, idx) => this.#extractInput(tx, idx, input));
+
+        return tx.virtualSize();
     }
 
     #fetchInputScript(index: number) {

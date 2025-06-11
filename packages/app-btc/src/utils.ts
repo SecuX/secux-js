@@ -122,6 +122,7 @@ export function getOutScriptSize(type: ScriptType): number {
 
         case ScriptType.P2WPKH: return 22;
 
+        case ScriptType.P2WSH:
         case ScriptType.P2TR: return 34;
     }
 
