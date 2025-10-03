@@ -80,7 +80,7 @@ export function proceed(response: communicationData): Response {
     }
     else {
         // wait for nordic chip processing
-        // delaySync();
+        if (_isUSB) delaySync();
         updateSize += getBuffer(exchange.data).length - 1;
     }
 
