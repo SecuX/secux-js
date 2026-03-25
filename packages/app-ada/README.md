@@ -366,6 +366,7 @@ ADA package for SecuX device
 | [addressIndex] | <code>number</code> | account index |
 | [stakeIndex] | <code>number</code> | stake key index |
 | [pointer] | [<code>PointerOption</code>](#PointerOption) | option for Pointer address |
+| [needChange] | <code>boolean</code> | use account index in exchange |
 
 <br/>
 <a name="txInput"></a>
@@ -382,6 +383,7 @@ ADA package for SecuX device
 | amount | <code>number</code> \| <code>string</code> | referenced transaction output amount |
 | [addressIndex] | <code>number</code> | default: 0 |
 | [stakeIndex] | <code>number</code> | default: 0 |
+| [tokens] | [<code>Array.&lt;token&gt;</code>](#token) |  |
 
 <br/>
 <a name="txOutput"></a>
@@ -430,6 +432,7 @@ ADA package for SecuX device
 | [stakeIndex] | <code>number</code> | default: 0 |
 | [fee] | <code>number</code> \| <code>string</code> |  |
 | [TimeToLive] | <code>number</code> |  |
+| [needVote] | <code>boolean</code> | enable vote default abstain  |
 
 <br/>
 <a name="unstakeOption"></a>
@@ -483,6 +486,18 @@ ADA package for SecuX device
 | serialized | [<code>communicationData</code>](#communicationData) |  |
 
 <br/>
+<a name="token"></a>
+
+## token : <code>object</code>
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| policyId | <code>string</code> | token contractAddress |
+| assetName | <code>number</code> | token symbol |
+| quantity | <code>number</code> \| <code>string</code> | token amount |
+
+<br/>
 
 * * *
 
@@ -490,3 +505,4 @@ ADA package for SecuX device
 
 authors:<br/>
 andersonwu@secuxtech.com
+kenchang@secuxtech.com

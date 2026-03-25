@@ -2,6 +2,7 @@
 Copyright 2022 SecuX Technology Inc
 Copyright Chen Wei-En
 Copyright Wu Tsung-Yu
+Copyright Chang Chia-Yu
 
 Licensed under the Apache License, Version 2.0 (the License);
 you may not use this file except in compliance with the License.
@@ -15,7 +16,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
+import "./polyfill";
 
 import { cardano } from "./load_lib";
 const cardanoV1 = require("cardano-crypto.js");
@@ -82,9 +83,11 @@ class SecuxADA {
                 ).to_base58();
 
             case AddressType.BASE:
+                const changeKey = pubkey.derive(1).derive(option?.addressIndex ?? 0);
+                const roleKey = option?.needChange ? changeKey : utxoKey;
                 return cardano.BaseAddress.new(
                     network.id,
-                    cardano.Credential.from_keyhash(utxoKey.to_raw_key().hash()),
+                    cardano.Credential.from_keyhash(roleKey.to_raw_key().hash()),
                     cardano.Credential.from_keyhash(stakeKey.to_raw_key().hash())
                 ).to_address().to_bech32();
 
@@ -413,6 +416,18 @@ class SecuxADA {
         const { builder, paths, publickeys } = CreateBaseTransaction(inputs);
         builder.set_withdrawals(withdraws);
 
+        if (option?.needVote) {
+            const certs = builder.get_certificates() ?? cardano.Certificates.new();
+    
+            certs.add(cardano.Certificate.new_vote_delegation(
+                cardano.VoteDelegation.new(
+                    stakeCert, 
+                    cardano.DRep.new_always_abstain()
+                )
+            ));
+            builder.set_certs(certs);
+        }
+
         // need to sign with stake key
         paths.push(`${input.path}/2/${stakeIndex}`);
         publickeys.push(stakeKey);
@@ -581,21 +596,33 @@ function CreateBaseTransaction(inputs: Array<TxInput>, config?: any) {
     const paths: string[] = [];
     const publickeys: Buffer[] = [];
     for (const txIn of inputs) {
+        const role = txIn.roleIndex ?? 0;
         const index = txIn.addressIndex ?? 0;
-        const pk = xpubToPublickey(convertToBuffer(txIn.xpublickey!), 0, index);
+        const pk = xpubToPublickey(convertToBuffer(txIn.xpublickey!), role, index);
 
         const utxo = cardano.TransactionInput.new(
             cardano.TransactionHash.from_bytes(Buffer.from(txIn.txId, "hex")),
             txIn.index
         );
-        const amount = cardano.Value.new(cardano.BigNum.from_str(txIn.amount.toString(10)));
+        let amount = cardano.Value.new(cardano.BigNum.from_str(txIn.amount.toString(10)));
 
-        builder.add_key_input(
-            cardano.PublicKey.from_bytes(pk).hash(),
-            utxo,
-            amount
-        );
-        paths.push(`${txIn.path}/0/${index}`);
+        if (txIn.tokens && txIn.tokens.length > 0) {
+            const multiAsset = cardano.MultiAsset.new();
+
+            for (const token of txIn.tokens) {
+                const assets = cardano.Assets.new();
+                assets.insert(cardano.AssetName.new(Buffer.from(token.assetName, "hex")), cardano.BigNum.from_str(token.quantity.toString(10)));
+
+                multiAsset.insert(cardano.ScriptHash.from_bytes(Buffer.from(token.policyId, "hex")), assets);
+            }
+            amount.set_multiasset(multiAsset);
+        }
+
+        const pkh = cardano.PublicKey.from_bytes(pk).hash();
+
+        builder.add_key_input(pkh, utxo, amount);
+
+        paths.push(`${txIn.path}/${role}/${index}`);
         publickeys.push(pk);
     }
 
