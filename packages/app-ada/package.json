@@ -1,6 +1,6 @@
 {
   "name": "@secux/app-ada",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "SecuX Hardware Wallet ADA API",
   "keywords": [
     "secux",
@@ -26,7 +26,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "cross-env NODE_OPTIONS=--max_old_space_size=4096 sh ../../build.sh",
+    "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 sh ../../build.sh",
     "doc": "npx tsc && jsdoc2md --template ./README.hbs ./lib/app-ada.js > README.md",
     "doc:api": "sh ../../api_doc.sh ./src/app-ada.ts ./lib/app-ada.js",
     "test:webusb": "cross-env NODE_OPTIONS=--max_old_space_size=4096 npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/usb.js",
