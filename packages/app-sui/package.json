@@ -1,0 +1,59 @@
+{
+  "name": "@secux/app-sui",
+  "version": "1.0.2",
+  "description": "SecuX Hardware Wallet SUI API",
+  "keywords": [
+    "secux",
+    "sign",
+    "transaction",
+    "tx",
+    "sui"
+  ],
+  "homepage": "https://github.com/secuxtech/secux-js/tree/master/packages/app-sui",
+  "author": "SecuX Technology Inc.",
+  "license": "Apache-2.0",
+  "main": "lib/app-sui.js",
+  "directories": {
+    "lib": "lib",
+    "test": "__tests__"
+  },
+  "files": [
+    "lib",
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "sh ../../build.sh",
+    "doc": "jsdoc2md --template ./README.hbs ./lib/app-sui.js > README.md",
+    "doc:api": "sh ../../api_doc.sh ./src/app-sui.ts ./lib/app-sui.js",
+    "test:webusb": "npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/usb.js",
+    "test:webble": "npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/ble.js",
+    "test:virtual": "npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/virtual.js",
+    "tsc": "tsc",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "@ethersproject/keccak256": "^5.4.0",
+    "@mysten/sui": "^1.45.2",
+    "@secux/protocol-transaction": "^3.0.0",
+    "@secux/utility": "^3.0.6",
+    "base-x": "^3.0.8",
+    "blakejs": "^1.2.1",
+    "secp256k1": "^4.0.2"
+  },
+  "peerDependencies": {
+    "@secux/transport": "^3.2.0"
+  },
+  "devDependencies": {
+    "@mysten/sui": "^1.45.2",
+    "@secux/transport": "^3.2.0",
+    "@secux/utility": "^3.0.6",
+    "@types/keccak": "^3.0.1",
+    "bip39": "^3.0.4",
+    "chai": "^4.3.4",
+    "ed25519-hd-key": "^1.2.0",
+    "mocha": "^9.0.3"
+  }
+}
