@@ -2,6 +2,7 @@
 Copyright 2022 SecuX Technology Inc
 Copyright Chen Wei-En
 Copyright Wu Tsung-Yu
+Copyright Chang Chia-Yu
 
 Licensed under the Apache License, Version 2.0 (the License);
 you may not use this file except in compliance with the License.
@@ -80,6 +81,17 @@ export function ow_strictPath(coinType: number | Array<number>, purpose?: number
     return ow.string.matches(new RegExp(`^m/[0-9]+'/${coins}'/[0-9]+'/[0-9]+/[0-9]+$`));
 }
 
+export function ow_hardenedPath(coinType: number | Array<number>, purpose?: number | Array<number>) {
+    const coins = numbersToRegExp((typeof coinType === "number") ? [coinType] : coinType);
+
+    if (purpose) {
+        const purposes = numbersToRegExp((typeof purpose === "number") ? [purpose] : purpose);
+        return ow.string.matches(new RegExp(`^m/${purposes}'/${coins}'/[0-9]+'/[0-9]+'/[0-9]+'$`));
+    }
+
+    return ow.string.matches(new RegExp(`^m/[0-9]+'/${coins}'/[0-9]+'/[0-9]+'/[0-9]+'$`));
+}
+
 export function ow_accountPath(coinType: number | Array<number>, purpose?: number | Array<number>) {
     const coins = numbersToRegExp((typeof coinType === "number") ? [coinType] : coinType);
 
@@ -143,6 +155,7 @@ export const supported_coin = Object.freeze([
     { purpose: [44], cointype: 501, name: "solana", module: "SecuxSOL", npm: "@secux/app-sol" },
     { purpose: [44], cointype: 330, name: "terra", module: "SecuxLUNA", npm: "@secux/app-luna" },
     { purpose: [44], cointype: 235, name: "fioprotocol", module: "SecuxFIO", npm: "@secux/app-fio" },
+    { purpose: [44, 54, 74], cointype: 784, name: "sui", module: "SecuxSUI", npm: "@secux/app-sui" },
 ]);
 
 export function isSupportedCoin(path: string): boolean {

@@ -1,0 +1,150 @@
+[![lerna](https://img.shields.io/badge/maintained%20with-lerna-cc00ff.svg)](https://lerna.js.org/)
+[![view on npm](https://badgen.net/npm/v/@secux/app-sui)](https://www.npmjs.com/package/@secux/app-sui)
+[![npm module downloads](https://badgen.net/npm/dt/@secux/app-sui)](https://www.npmjs.org/package/@secux/app-sui)
+
+# `@secux/app-sui`
+
+> SecuX Hardware Wallet SUI API
+
+## Usage
+
+```ts
+import { SecuxSUI } from "@secux/app-sui";
+import { SuiCurve } from "@secux/app-sui/interface";
+```
+
+First, create instance of ITransport
+- [Web Usb](https://www.npmjs.com/package/@secux/transport-webusb)
+- [Web Bluetooth](https://www.npmjs.com/package/@secux/transport-webble)
+- [React Native Bluetooth](https://www.npmjs.com/package/@secux/transport-reactnative)
+
+<br />
+
+## Examples
+1. Get address of bip44 path
+```ts
+const path = "m/44'/784'/0'/0'/0'";
+const address = await device.getAddress(path);
+
+/*
+
+// transfer data to hardware wallet by custom transport layer.
+const data = SecuxSUI.prepareAddress(path);
+const response = await device.Exchange(data);
+const address = SecuxSUI.resolveAddress(response);
+
+*/
+```
+
+2. Sign transaction (Transfer SUI)
+```ts
+const path = "m/44'/784'/0'/0'/0'";
+const publickey = await device.getPublickey(path);
+const content = {
+publickey,
+gasPrice: 1000,
+gasBudget: 10000000,
+gasPayment: [
+{
+objectId: "0x40375a2f57a9117387a32decab661159392ed0f862ead65fd32e7f3d61180b43",
+version: 123,
+digest: "6f5GfW6G6VvG88vYg4V9m8V9V8VvG88vYg4V9m8V9V8="
+}
+],
+to: "0x89ad0df73ca35d48721c0ad146e2e50ed685324578b8a531f8f35f1c44ba278d",
+amount: 1000000000 // 1 SUI
+};
+
+// sign
+const { bytes, signature } = await device.sign(path, content);
+
+/*
+
+// transfer data to hardware wallet by custom transport layer.
+const { commandData, rawTx } = await SecuxSUI.prepareSign(path, content);
+const response = await device.Exchange(commandData);
+const { bytes, signature } = SecuxSUI.resolveTransaction(response, {
+rawTx,
+publickey,
+curve: SuiCurve.ED25519
+});
+
+*/
+```
+
+3. Sign transaction (Transfer Token/NFT)
+```ts
+const content = {
+publickey,
+gasPrice: 1000,
+gasBudget: 10000000,
+gasPayment: [
+{
+objectId: "0x40375a2f57a9117387a32decab661159392ed0f862ead65fd32e7f3d61180b43",
+version: 123,
+digest: "6f5GfW6G6VvG88vYg4V9m8V9V8VvG88vYg4V9m8V9V8="
+}
+],
+to: "0x89ad0df73ca35d48721c0ad146e2e50ed685324578b8a531f8f35f1c44ba278d",
+// for tokens
+amount: 1000000,
+tokens: [
+{
+objectId: "0x...",
+version: 1,
+digest: "..."
+}
+],
+// or for nfts
+/*
+nfts: [
+{
+objectId: "0x...",
+version: 1,
+digest: "..."
+}
+]
+*/
+};
+
+const { bytes, signature } = await device.sign(path, content);
+```
+
+# API Reference
+{{#class name="SecuxSUI"}}
+{{>body~}}
+{{>member-index~}}
+<br />
+{{#children inherited=SecuxSUI ~}}
+<a name="{{{anchorName}}}"></a>
+
+{{>heading-indent}}**{{>sig-name}}**
+{{>deprecated~}}
+{{#if description}}*{{{inlineLinks description}}}*
+
+{{/if}}
+{{>implements~}}
+{{>overrides~}}
+{{>returns~}}
+{{>throws~}}
+{{>access~}}
+{{>readOnly~}}
+{{>params~}}
+{{>properties~}}
+{{>examples~}}
+<br />
+{{/children~}}
+{{/class}}
+
+{{#orphans}}
+{{#if properties}}{{>header~}}{{/if~}}
+{{>properties~}}
+<br />
+{{/orphans}}
+
+* * *
+
+&copy; 2018-21 SecuX Technology Inc.
+
+authors:<br />
+kenchang@secuxtech.com --

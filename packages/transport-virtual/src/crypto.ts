@@ -2,6 +2,7 @@
 Copyright 2022 SecuX Technology Inc
 Copyright Chen Wei-En
 Copyright Wu Tsung-Yu
+Copyright Chang Chia-Yu
 
 Licensed under the Apache License, Version 2.0 (the License);
 you may not use this file except in compliance with the License.
@@ -16,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
+import { blake2b } from '@noble/hashes/blake2';
 import { sha256, sha512, ripemd160, hmac } from "hash.js";
 import { keccak_256 } from "@noble/hashes/sha3";
 import type { secp256k1 as ISECP256k1, schnorr } from "@noble/curves/secp256k1";
@@ -67,6 +68,10 @@ class Crypto {
 
     static keccak256(data: Uint8Array): Uint8Array {
         return keccak_256.create().update(data).digest();
+    }
+
+    static blake2b(data: Uint8Array): Uint8Array {
+        return blake2b(data, { dkLen: 32 });
     }
 
     static get secp256k1(): typeof ISECP256k1 & ISchnorr {
