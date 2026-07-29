@@ -85,17 +85,17 @@ export function test(GetDevice) {
       const path = `m/44'/784'/0'/0'/0'`;
 
       const txDetail = {
-        to: "0xcf0e82a4e6fd6246f52a7b54897364ba103b56e85e34b2a7726f0e5e25fd05d2",
-        amount: 34535999,
-        gasPrice: 556,
-        gasBudget: 15000,
-        gasPayment: [
-          {
-            objectId: "0xb636777b78dd9cd2f56064e432d6a678e28c6c4a6c35f0b8fdd167bcdcb4e5ea",
-            version: "832856905",
-            digest: "2DCDX5ajCcWuKxU2nzpH9dknq8KxqTCJeqh5o7jz1gE2"
-          }
-        ]
+        to: "0xb249635cabe0218c96b1f91bc76db8da0dc03a0c7fe1b6919fa563b0c29f96e6",
+        amount: "36d94c8b4a00",
+        gasPrice: 100,
+        gasBudget: 1088000,
+        // gasPayment: [
+        //   {
+        //     objectId: "0xb636777b78dd9cd2f56064e432d6a678e28c6c4a6c35f0b8fdd167bcdcb4e5ea",
+        //     version: "832856905",
+        //     digest: "2DCDX5ajCcWuKxU2nzpH9dknq8KxqTCJeqh5o7jz1gE2"
+        //   }
+        // ]
       };
 
       it('query a SUI publickey', async () => {

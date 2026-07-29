@@ -25,6 +25,32 @@ if (typeof globalScope.self === 'undefined') {
     globalScope.self = globalScope;
 }
 
+if (typeof (Object as any).hasOwn === "undefined") {
+    Object.defineProperty(Object, "hasOwn", {
+        configurable: true,
+        writable: true,
+        value: function hasOwn(object: any, property: PropertyKey): boolean {
+            if (object === null || object === undefined) {
+                throw new TypeError("Cannot convert undefined or null to object");
+            }
+            return Object.prototype.hasOwnProperty.call(object, property);
+        },
+    });
+}
+
+if (typeof (Array.prototype as any).at === "undefined") {
+    Object.defineProperty(Array.prototype, "at", {
+        configurable: true,
+        writable: true,
+        value: function at(index: number): any {
+            const length = this.length >>> 0;
+            const integer = Math.trunc(Number(index)) || 0;
+            const position = integer < 0 ? length + integer : integer;
+            return position < 0 || position >= length ? undefined : this[position];
+        },
+    });
+}
+
 if (typeof globalScope.TextEncoder === "undefined") {
     class TextEncoder {
         encode(input?: string): Uint8Array {
@@ -53,5 +79,64 @@ if (typeof globalScope.atob === "undefined") {
 if (typeof globalScope.btoa === "undefined") {
     globalScope.btoa = function (bin: string): string {
         return Buffer.from(bin, 'binary').toString('base64');
+    };
+}
+
+if (typeof globalScope.structuredClone === "undefined") {
+    globalScope.structuredClone = function structuredClone<T>(value: T): T {
+        const seen = new Map<object, any>();
+
+        const clone = (input: any): any => {
+            if (input === null || typeof input !== "object") {
+                if (typeof input === "function" || typeof input === "symbol") {
+                    throw new TypeError("Value cannot be cloned");
+                }
+                return input;
+            }
+
+            const cached = seen.get(input);
+            if (cached !== undefined) return cached;
+
+            if (input instanceof Date) return new Date(input.getTime());
+            if (input instanceof ArrayBuffer) return input.slice(0);
+            if (ArrayBuffer.isView(input)) {
+                if (input instanceof DataView) {
+                    const buffer = input.buffer.slice(
+                        input.byteOffset,
+                        input.byteOffset + input.byteLength
+                    );
+                    return new DataView(buffer);
+                }
+                const TypedArray = input.constructor as {
+                    new(value: ArrayBufferView): ArrayBufferView;
+                };
+                return new TypedArray(input);
+            }
+
+            if (input instanceof Map) {
+                const output = new Map();
+                seen.set(input, output);
+                input.forEach((entryValue: any, entryKey: any) => {
+                    output.set(clone(entryKey), clone(entryValue));
+                });
+                return output;
+            }
+
+            if (input instanceof Set) {
+                const output = new Set();
+                seen.set(input, output);
+                input.forEach((entryValue: any) => output.add(clone(entryValue)));
+                return output;
+            }
+
+            const output: any = Array.isArray(input) ? [] : {};
+            seen.set(input, output);
+            Object.keys(input).forEach(key => {
+                output[key] = clone(input[key]);
+            });
+            return output;
+        };
+
+        return clone(value);
     };
 }

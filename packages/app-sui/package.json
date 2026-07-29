@@ -26,6 +26,11 @@
   },
   "scripts": {
     "build": "sh ../../build.sh",
+    "build:flutter": "webpack --config webpack.flutter.config.js",
+    "build:flutter:all": "npm run typecheck:flutter && npm run build:flutter:debug && npm run build:flutter && npm run verify:flutter",
+    "build:flutter:debug": "cross-env FLUTTER_DEBUG=1 webpack --config webpack.flutter.config.js",
+    "typecheck:flutter": "tsc --project tsconfig.json --noEmit --module ESNext --moduleResolution Bundler",
+    "verify:flutter": "node ./scripts/verify-flutter-bundle.js",
     "doc": "jsdoc2md --template ./README.hbs ./lib/app-sui.js > README.md",
     "doc:api": "sh ../../api_doc.sh ./src/app-sui.ts ./lib/app-sui.js",
     "test:webusb": "npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/usb.js",
@@ -36,9 +41,9 @@
   },
   "dependencies": {
     "@ethersproject/keccak256": "^5.4.0",
-    "@mysten/sui": "^1.45.2",
+    "@mysten/sui": "^2.22.1",
     "@secux/protocol-transaction": "^3.0.0",
-    "@secux/utility": "^3.0.6",
+    "@secux/utility": "^3.0.20",
     "base-x": "^3.0.8",
     "blakejs": "^1.2.1",
     "secp256k1": "^4.0.2"
@@ -47,13 +52,19 @@
     "@secux/transport": "^3.2.0"
   },
   "devDependencies": {
-    "@mysten/sui": "^1.45.2",
+    "@babel/core": "^7.29.7",
+    "@babel/preset-env": "^7.29.7",
+    "@mysten/sui": "^2.22.1",
     "@secux/transport": "^3.2.0",
-    "@secux/utility": "^3.0.6",
+    "@secux/utility": "^3.0.20",
     "@types/keccak": "^3.0.1",
+    "babel-loader": "^10.1.1",
     "bip39": "^3.0.4",
+    "buffer": "^6.0.3",
     "chai": "^4.3.4",
     "ed25519-hd-key": "^1.2.0",
-    "mocha": "^9.0.3"
+    "mocha": "^9.0.3",
+    "process": "^0.11.10",
+    "typescript": "^5.7.3"
   }
 }

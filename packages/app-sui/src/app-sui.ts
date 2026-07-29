@@ -37,6 +37,7 @@ import {
   loadPlugin,
   Logger,
 } from "@secux/utility";
+import { bcs } from '@mysten/sui/bcs';
 import { ow_nftData, ow_path, ow_publickey, ow_tokenData, ow_TransactionObject, ow_transferData, SuiCurve, TransactionObject, txDetail } from "./interface";
 
 export { SecuxSUI };
@@ -111,85 +112,107 @@ class SecuxSUI {
    * @returns {prepared} prepared object
    */
   static async prepareSign(
-    path: string,
-    content: txDetail
+      path: string,
+      content: txDetail
   ): Promise<{ commandData: communicationData; rawTx: communicationData }> {
-    ow(path, ow_path);
-    const curve = curveFromPath(path);
-    const tx = new Transaction();
-    tx.setSender(SecuxSUI.addressConvert(content.publickey, curve));
-    tx.setGasPrice(Number(content.gasPrice));
-    tx.setGasBudget(Number(content.gasBudget));
+      ow(path, ow_path);
+      const curve = curveFromPath(path);
+      
+      // 1. 初始化交易（完全離線，不引入 SuiClient）
+      const tx = new Transaction();
+      const sender = SecuxSUI.addressConvert(content.publickey, curve);
+      
+      // 2. 設定發送者與離線 Gas 參數
+      tx.setSender(sender);
+      tx.setGasPrice(Number(content.gasPrice));
+      tx.setGasBudget(Number(content.gasBudget));
 
-    tx.setGasPayment(content.gasPayment.map(ref => ({
-      objectId: ref.objectId,
-      version: String(ref.version),
-      digest: ref.digest
-    })));
+      // 4. 根據交易類型構建 PTB
+      if (content.nfts && content.nfts.length > 0) {
+          // NFT 等不可分割實體 Object：維護傳統 transferObjects 邏輯
+          ow(content, ow_nftData);
+          const transferObjects = content.nfts.map(ref => tx.objectRef({
+              objectId: ref.objectId,
+              version: String(ref.version),
+              digest: ref.digest
+          }));
+          tx.transferObjects(transferObjects, content.to);
+      } else {
+          // FT 代幣或 SUI 轉帳：使用 Address Balance 指令 (send_funds)
+          const coinType = getPureCoinType(content.type);
 
-    let transferObjects: TransactionObjectArgument[] = [];
+          const withdrawalInput = tx.withdrawal({
+              amount: BigInt(content.amount!),
+              type: coinType
+          });
 
-    if (content.tokens) {
-      ow(content, ow_tokenData);
-      // Send Custom Token: Merge objects if needed, then split
-      const primaryToken = tx.objectRef({
-        objectId: content.tokens[0].objectId,
-        version: String(content.tokens[0].version),
-        digest: content.tokens[0].digest
-      });
+          // 兌換提款憑證為 Balance
+          const [extractedBalance] = tx.moveCall({
+              target: '0x2::balance::redeem_funds',
+              typeArguments: [coinType],
+              arguments: [withdrawalInput]
+          });
 
-      const tokensToMerge = content.tokens.slice(1).map(ref => tx.objectRef({
-        objectId: ref.objectId,
-        version: String(ref.version),
-        digest: ref.digest
-      }));
-      if (tokensToMerge.length > 0) {
-        tx.mergeCoins(primaryToken, tokensToMerge);
+          // 呼叫 sui::balance::send_funds 轉給目標地址
+          tx.moveCall({
+              target: '0x2::balance::send_funds',
+              typeArguments: [coinType],
+              arguments: [
+                  extractedBalance,
+                  tx.pure.address(content.to),
+              ],
+          });
       }
 
-      const [token] = tx.splitCoins(primaryToken,[tx.pure.u64(content.amount)]);
-      transferObjects = [token];
-      tx.moveCall({
-        target: coinTransferTarget,
-        typeArguments: [ content.type.startsWith('0x2::coin::Coin') ? content.type : `0x2::coin::Coin<${content.type}>` ],
-        arguments: [
-          token,
-          tx.pure.address(content.to)
-        ],
+      let txBytes;
+      if (content.gasPayment && content.gasPayment.length > 0) {
+          tx.setGasPayment(content.gasPayment.map(ref => ({
+              objectId: ref.objectId,
+              version: String(ref.version),
+              digest: ref.digest
+          })));
+          txBytes = await tx.build();
+      } else {
+        const kindBytes = await tx.build({ onlyTransactionKind: true });
+
+        // 步驟 B-2: 離線手動組裝包含空 payment 的完整 TransactionData
+        const transactionData = {
+            V1: {
+                kind: bcs.TransactionKind.parse(kindBytes),
+                sender: sender,
+                gasData: {
+                    payment: [], // 👈 明確告訴鏈：用 Address Balance 扣除 Gas！
+                    owner: sender,
+                    price: BigInt(content.gasPrice),
+                    budget: BigInt(content.gasBudget),
+                },
+                expiration: { None: true },
+            },
+        };
+
+        // 步驟 B-3: 使用 BCS 直接序列化出完整的 txBytes (完全不需要 Client)
+        txBytes = bcs.TransactionData.serialize(transactionData).toBytes();;
+      }
+
+      // 5. 離線序列化交易字節 (build 時不帶入 client 參數)
+
+      // 6. 打包 Sui Intent Message (0, 0, 0) 並傳給 SecuX 硬體簽章工具
+      const intentMessage = new Uint8Array(3 + txBytes.length);
+      intentMessage.set([0, 0, 0], 0);
+      intentMessage.set(txBytes, 3);
+
+      return wrapResult({
+          commandData: SecuxTransactionTool.signRawTransaction(
+              path,
+              Buffer.from(intentMessage),
+              {
+                  tp: TransactionType.NORMAL,
+                  curve: curve,
+                  chainId: 0
+              }
+          ),
+          rawTx: toCommunicationData(Buffer.from(txBytes)),
       });
-    } else if (content.nfts) {
-      ow(content, ow_nftData);
-      // Send NFTs: Transfer all specified objects directly
-      transferObjects = content.nfts.map(ref => tx.objectRef({
-        objectId: ref.objectId,
-        version: String(ref.version),
-        digest: ref.digest
-      }));
-      tx.transferObjects(transferObjects, content.to);
-    } else {
-      ow(content, ow_transferData);
-      const [coin] = tx.splitCoins(tx.gas, [tx.pure.u64(content.amount!)]);
-      transferObjects = [coin];
-      tx.transferObjects(transferObjects, content.to);
-    }
-
-    const txBytes = await tx.build();
-
-    const intentMessage = new Uint8Array([0, 0, 0].length + txBytes.length);
-    intentMessage.set([0, 0, 0]);
-    intentMessage.set(txBytes, 3);
-
-    return wrapResult({
-      commandData: SecuxTransactionTool.signRawTransaction(
-        path,
-        Buffer.from(intentMessage),
-        {
-          tp: TransactionType.NORMAL,
-          curve: curve,
-          chainId: 0
-        }),
-      rawTx: toCommunicationData(Buffer.from(txBytes)),
-    });
   }
 
   /**
@@ -335,6 +358,14 @@ function suiPublickeyFromCurve(publickey: string | Buffer, curve: EllipticCurve)
   return publicKey;
 }
 
+function getPureCoinType(rawType: string | undefined): string {
+    if (!rawType) return '0x2::sui::SUI';
+    
+    // 如果帶有 0x2::coin::Coin< ... > 包裝，將其撥開提取內部的 Type
+    const match = rawType.match(/^0x2::coin::Coin<(.+)>$/);
+    return match ? match[1] : rawType;
+}
+
 /**
  * Data type for transmission.
  * @typedef {string|Buffer} communicationData
@@ -359,3 +390,4 @@ function suiPublickeyFromCurve(publickey: string | Buffer, curve: EllipticCurve)
  * @property {communicationData} commandData data for sending to device
  * @property {communicationData} rawTx unsigned raw transaction
  */
+

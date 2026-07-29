@@ -72,6 +72,7 @@ export type txDetail = {
   type?: string,
   tokens?: suiObjectRef[],
   nfts?: suiObjectRef[],
+  coinType: string;
 };
 
 const price = ow.any(ow.number.uint32.positive, owTool.numberString);

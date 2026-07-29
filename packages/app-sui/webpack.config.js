@@ -9,23 +9,30 @@ module.exports = {
     },
     mode: 'production',
     module: {
-        rules: [
-            {
-                test: /\.ts$/,
-                use: {
-                    loader: 'ts-loader',
-                    options: {
-                        transpileOnly: true
-                    }
-                },
-                exclude: /node_modules/
+      rules: [
+        {
+          test: /\.ts$/,
+          use: {
+            loader: 'ts-loader',
+            options: {
+              transpileOnly: true
             }
-        ]
+          },
+          exclude: /node_modules/
+        },
+        // 👈 處理 Pure ESM 套件無副檔名引用的問題
+        {
+          test: /\.m?js$/,
+          resolve: {
+            fullySpecified: false
+          }
+        }
+      ]
     },
     resolve: {
-        extensions: ['.ts', '.js'],
-        fallback: {
-        }
+      extensions: ['.ts', '.js', '.tsx', '.mjs'],
+      // 👈 讓 Webpack 優先讀取 package.json 中的 "import" (ESM) 欄位
+      conditionNames: ['import', 'require', 'node', 'default']
     },
     externals: {
         "@secux/protocol-transaction": "@secux/protocol-transaction",
