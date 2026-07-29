@@ -60,5 +60,14 @@ module.exports = {
     },
     experiments: {
         asyncWebAssembly: true
-    }
+    },
+    stats: {
+        warningsFilter: /cardano_serialization_lib_bg/, // 這是備用過濾法，雙重保險
+        children: false // 減少子編譯過程的雜訊
+    },
+    ignoreWarnings: [
+        (warning) =>
+            warning.message.includes("Critical dependency: the request of a dependency is an expression") &&
+            warning.module.resource.includes("cardano-serialization-lib-asmjs")
+    ],
 }

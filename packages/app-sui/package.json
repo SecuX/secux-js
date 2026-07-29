@@ -25,11 +25,12 @@
     "access": "public"
   },
   "scripts": {
-    "build": "sh ../../build.sh",
+    "build": "node ./scripts/build.js",
     "build:flutter": "webpack --config webpack.flutter.config.js",
     "build:flutter:all": "npm run typecheck:flutter && npm run build:flutter:debug && npm run build:flutter && npm run verify:flutter",
     "build:flutter:debug": "cross-env FLUTTER_DEBUG=1 webpack --config webpack.flutter.config.js",
     "typecheck:flutter": "tsc --project tsconfig.json --noEmit --module ESNext --moduleResolution Bundler",
+    "verify": "node ./scripts/verify-normal-bundles.js",
     "verify:flutter": "node ./scripts/verify-flutter-bundle.js",
     "doc": "jsdoc2md --template ./README.hbs ./lib/app-sui.js > README.md",
     "doc:api": "sh ../../api_doc.sh ./src/app-sui.ts ./lib/app-sui.js",

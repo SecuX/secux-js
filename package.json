@@ -1,5 +1,10 @@
 {
   "name": "secuxjs",
+  "private": true,
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
+  },
   "workspaces": [
     "packages/!(sdk)/**"
   ],
@@ -18,7 +23,7 @@
     "@secux/app-bnb": "file:packages/app-bnb",
     "@secux/app-btc": "file:packages/app-btc",
     "@secux/app-eth": "file:packages/app-eth",
-    "@secux/app-fil": "file:packages/app-fil",
+    "@secux/app-fio": "file:packages/app-fio",
     "@secux/app-luna": "file:packages/app-luna",
     "@secux/app-sol": "file:packages/app-sol",
     "@secux/app-trx": "file:packages/app-trx",
@@ -35,11 +40,11 @@
     "@secux/transport-webusb": "file:packages/transport-webusb",
     "@secux/utility": "file:packages/utility",
     "@types/node": "^16.4.13",
-    "@types/react-native": "^0.73.0",
     "agent-base": "^6.0.2",
     "chai": "^4.3.4",
     "cross-env": "^7.0.3",
     "crypto-browserify": "^3.12.0",
+    "esbuild-loader": "^4.5.0",
     "lerna": "^3.20.2",
     "mocha": "^9.0.3",
     "multicoin-address-validator": "^0.5.2",
@@ -53,7 +58,9 @@
     "webpack": "^5.51.1",
     "webpack-cli": "^4.8.0",
     "webpack-dev-server": "^4.1.0",
-    "winston": "^3.3.3",
-    "yarn": "^1.22.15"
+    "winston": "^3.3.3"
+  },
+  "dependencies": {
+    "jsdoc-to-markdown": "^9.1.3"
   }
 }

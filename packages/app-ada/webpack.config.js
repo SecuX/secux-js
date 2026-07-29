@@ -1,3 +1,6 @@
+const path = require("path");
+const { EsbuildPlugin } = require("esbuild-loader");
+
 module.exports = {
     entry: "./src/app-ada.ts",
     output: {
@@ -8,11 +11,20 @@ module.exports = {
         }
     },
     mode: 'production',
+    cache: {
+        type: 'filesystem',
+        cacheDirectory: path.resolve(__dirname, '../../tmp/webpack/app-ada'),
+    },
     module: {
         rules: [
             {
                 test: /\.ts$/,
-                use: 'ts-loader',
+                use: {
+                    loader: 'ts-loader',
+                    options: {
+                        transpileOnly: true,
+                    },
+                },
                 exclude: /node_modules/
             }
         ]
@@ -40,6 +52,17 @@ module.exports = {
     },
     optimization: {
         minimize: true,
-        removeAvailableModules: true,
+        minimizer: [
+            new EsbuildPlugin({
+                target: 'es2017',
+                // Preserve Webpack's top-level UMD environment detection.
+                // esbuild-loader otherwise defaults to "iife" for web targets,
+                // which wraps the UMD factory in a synthetic CommonJS module and
+                // makes QuickJS take the require() branch.
+                format: undefined,
+                legalComments: 'none',
+            }),
+        ],
+        removeAvailableModules: false,
     }
 }

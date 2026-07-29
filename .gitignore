@@ -8,3 +8,8 @@ lerna-error.log
 yarn-error.log
 *.swp
 package-lock.json
+tmp.ts
+/tmp/*
+packages/**/tmp
+packages/**/__tests__/index.js
+packages/**/dist-debug/

@@ -1,9 +1,9 @@
 {
   "packages": [
-    "packages/*"
+    "packages/!(sdk)"
   ],
   "ignoreChanges": ["**/__tests__/**", "**/*.md"],
   "version": "independent",
-  "npmClient": "yarn",
-  "useWorkspaces": true
+  "npmClient": "npm",
+  "useWorkspaces": false
 }
