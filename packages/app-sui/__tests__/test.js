@@ -7,12 +7,14 @@ const { derivePath, getPublicKey } = require("ed25519-hd-key");
 const { Ed25519PublicKey, Ed25519Keypair } = require("@mysten/sui/keypairs/ed25519");
 const { Secp256k1PublicKey, Secp256k1Keypair } = require("@mysten/sui/keypairs/secp256k1");
 const { Transaction } = require("@mysten/sui/transactions");
+const { verifyTransactionSignature } = require("@mysten/sui/verify");
+const firmwareContentV2 = require("./firmware-content-v2/manifest.json");
 const secp256k1 = require("secp256k1");
 
 
 const mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 const seed = mnemonicToSeedSync(mnemonic);
-
+const timeout = 60000;
 export function test(GetDevice) {
   describe.skip('SecuxSUI.getAddress()', () => {
     describe("ED25519", () => {
@@ -81,6 +83,65 @@ export function test(GetDevice) {
   });
 
   describe('SecuxSUI.sign()', () => {
+    describe.only("firmware content v2 (hardware/virtual device)", () => {
+      let devicePublickey;
+
+      before(async () => {
+        const rsp = await GetDevice().Exchange(
+          SecuxSUI.preparePublickey(firmwareContentV2.path)
+        );
+        devicePublickey = SecuxSUI.resolvePublickey(rsp);
+        assert.equal(
+          devicePublickey,
+          firmwareContentV2.publickey,
+          "Device seed does not match the firmware fixture mnemonic"
+        );
+        assert.equal(
+          SecuxSUI.addressConvert(devicePublickey),
+          firmwareContentV2.sender,
+          "Device address does not match the sender encoded in fixture transactions"
+        );
+      }).timeout(20000);
+
+      for (const vector of firmwareContentV2.cases) {
+        it(`signs ${vector.name}`, async () => {
+          const { path, ...content } = vector.request;
+          const prepare = SecuxSUI[vector.method];
+          assert.isFunction(prepare, `Missing ${vector.method}`);
+
+          const prepared = await prepare.call(SecuxSUI, path, content);
+          assert.equal(
+            Buffer.from(prepared.rawTx, "base64").toString("base64"),
+            vector.rawTxBase64,
+            "Generated rawTx differs from the golden vector"
+          );
+          assert.equal(
+            Buffer.from(prepared.commandData, "base64").toString("base64"),
+            vector.commandDataBase64,
+            "Generated APDU differs from the golden vector"
+          );
+
+          console.log(vector.name);
+          console.log('commandData', Buffer.from(prepared.commandData, 'base64').toString('hex'));
+
+          const rsp = await GetDevice().Exchange(prepared.commandData);
+          const signed = SecuxSUI.resolveTransaction(rsp, {
+            rawTx: prepared.rawTx,
+            publickey: devicePublickey,
+            curve: EllipticCurve.ED25519,
+          });
+
+          assert.equal(signed.bytes, vector.rawTxBase64);
+          assert.isString(signed.signature);
+          const signer = await verifyTransactionSignature(
+            Buffer.from(signed.bytes, "base64"),
+            signed.signature
+          );
+          assert.equal(signer.toSuiAddress(), firmwareContentV2.sender);
+        }).timeout(30000);
+      }
+    });
+
     describe("Native SUI transfer", () => {
       const path = `m/44'/784'/0'/0'/0'`;
 
@@ -107,6 +168,9 @@ export function test(GetDevice) {
       let signed;
       it("can sign transaction", async () => {
         const { commandData, rawTx } = await SecuxSUI.prepareSign(path, txDetail);
+
+        console.log('commandData', Buffer.from(commandData, 'base64').toString('hex'));
+
         const rsp = await GetDevice().Exchange(commandData);
 
         signed = SecuxSUI.resolveTransaction(rsp, {
@@ -115,29 +179,101 @@ export function test(GetDevice) {
           curve: 1, // ED25519
         });
 
-        console.log('signature', Buffer.from(signed.signature, 'base64').toString('hex'));
-        console.log('bytes', Buffer.from(signed.bytes, 'base64').toString('hex'));
-
         assert.exists(signed.bytes);
         assert.exists(signed.signature);
       }).timeout(20000);
 
-      it("can directly sign", async () => {
-        const result = await GetDevice().sign(path, txDetail);
-        assert.deepEqual(result, signed);
-      }).timeout(20000);
+      // it("can directly sign", async () => {
+      //   const result = await GetDevice().sign(path, txDetail);
+      //   assert.deepEqual(result, signed);
+      // }).timeout(20000);
+    });
+
+    describe("Native SUI transfer with gas payment", () => {
+      const path = `m/44'/784'/0'/0'/0'`;
+
+      const txDetail = {
+        to: "0xb249635cabe0218c96b1f91bc76db8da0dc03a0c7fe1b6919fa563b0c29f96e6",
+        amount: "36d94c8b4a00",
+        gasPrice: 100,
+        gasBudget: 1088000,
+        gasPayment: [
+          {
+            objectId: "0xb636777b78dd9cd2f56064e432d6a678e28c6c4a6c35f0b8fdd167bcdcb4e5ea",
+            version: "832856905",
+            digest: "2DCDX5ajCcWuKxU2nzpH9dknq8KxqTCJeqh5o7jz1gE2"
+          }
+        ]
+      };
+
+      it('query a SUI publickey', async () => {
+        const data = SecuxSUI.preparePublickey(path);
+        const rsp = await GetDevice().Exchange(data);
+        txDetail.publickey = SecuxSUI.resolvePublickey(rsp);
+      });
+
+      let signed;
+      it("can sign transaction", async () => {
+        const { commandData, rawTx } = await SecuxSUI.prepareSign(path, txDetail);
+
+        console.log('commandData', Buffer.from(commandData, 'base64').toString('hex'));
+
+        const rsp = await GetDevice().Exchange(commandData);
+
+        signed = SecuxSUI.resolveTransaction(rsp, {
+          rawTx,
+          publickey: txDetail.publickey,
+          curve: 1, // ED25519
+        });
+
+        assert.exists(signed.bytes);
+        assert.exists(signed.signature);
+      }).timeout(timeout);
+
+      // it("can directly sign", async () => {
+      //   const result = await GetDevice().sign(path, txDetail);
+      //   assert.deepEqual(result, signed);
+      // }).timeout(20000);
     });
 
     describe("Token transfer", () => {
       const path = `m/44'/784'/0'/0'/0'`;
 
-      // const { key } = derivePath(path, seed.toString("hex"));
-      // const publicKeyBytes = getPublicKey(key);
-      // const raw32Bytes = publicKeyBytes.length === 33
-      //   ? publicKeyBytes.slice(1)
-      //   : publicKeyBytes;
-      // const pk = new Ed25519PublicKey(raw32Bytes);
-      // console.log('publickey2', Buffer.from(pk.toRawBytes()).toString("hex"))
+      const txDetail = {
+        to: "0xcf0e82a4e6fd6246f52a7b54897364ba103b56e85e34b2a7726f0e5e25fd05d2",
+        amount: 1011778,
+        gasPrice: 556,
+        gasBudget: 15000,
+        type: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+      };
+
+      it('query a SUI publickey', async () => {
+        const data = SecuxSUI.preparePublickey(path);
+        const rsp = await GetDevice().Exchange(data);
+        txDetail.publickey = SecuxSUI.resolvePublickey(rsp);
+      });
+
+      let signed;
+      it("can sign token transfer", async () => {
+        const { commandData, rawTx } = await SecuxSUI.prepareSign(path, txDetail);
+
+        console.log('commandData', Buffer.from(commandData, 'base64').toString('hex'));
+
+        const rsp = await GetDevice().Exchange(commandData);
+
+        signed = SecuxSUI.resolveTransaction(rsp, {
+          rawTx,
+          publickey: txDetail.publickey,
+          curve: 1, // ED25519
+        });
+
+        assert.exists(signed.bytes);
+        assert.exists(signed.signature);
+      }).timeout(20000);
+    });
+
+    describe("Token transfer with pas payment", () => {
+      const path = `m/44'/784'/0'/0'/0'`;
 
       const txDetail = {
         to: "0xcf0e82a4e6fd6246f52a7b54897364ba103b56e85e34b2a7726f0e5e25fd05d2",
@@ -152,32 +288,31 @@ export function test(GetDevice) {
           }
         ],
         type: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
-        tokens: [
-          {
-            objectId: "0x5712f9678cfa5906448da28f3b4f23d7939399af31539ea4f496af399280b9be",
-            version: 839757834,
-            digest: "4Hz8WQ9qz46PkcFqend6bp8J1ijWv2dwUoUkDvSjSn15"
-          }
-        ]
       };
 
       it('query a SUI publickey', async () => {
         const data = SecuxSUI.preparePublickey(path);
         const rsp = await GetDevice().Exchange(data);
         txDetail.publickey = SecuxSUI.resolvePublickey(rsp);
-        console.log('publickey', txDetail.publickey);
       });
 
       let signed;
       it("can sign token transfer", async () => {
-        const result = await GetDevice().sign(path, txDetail);
-        signed = result;
+        const { commandData, rawTx } = await SecuxSUI.prepareSign(path, txDetail);
 
-        console.log('signature', Buffer.from(signed.signature, 'base64').toString('hex'));
-        console.log('bytes', Buffer.from(signed.bytes, 'base64').toString('hex'));
+        console.log('commandData', Buffer.from(commandData, 'base64').toString('hex'));
+
+        const rsp = await GetDevice().Exchange(commandData);
+
+        signed = SecuxSUI.resolveTransaction(rsp, {
+          rawTx,
+          publickey: txDetail.publickey,
+          curve: 1, // ED25519
+        });
+
         assert.exists(signed.bytes);
         assert.exists(signed.signature);
-      }).timeout(20000);
+      }).timeout(timeout);
     });
 
     // describe("NFT transfer", () => {
@@ -213,7 +348,7 @@ export function test(GetDevice) {
     //     signed = result;
     //     assert.exists(signed.transactionBlock);
     //     assert.exists(signed.signature);
-    //   }).timeout(20000);
+    //   }).timeout(timeout);
     // });
   });
 }

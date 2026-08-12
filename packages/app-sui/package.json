@@ -1,6 +1,6 @@
 {
   "name": "@secux/app-sui",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "description": "SecuX Hardware Wallet SUI API",
   "keywords": [
     "secux",
@@ -34,6 +34,7 @@
     "verify:flutter": "node ./scripts/verify-flutter-bundle.js",
     "doc": "jsdoc2md --template ./README.hbs ./lib/app-sui.js > README.md",
     "doc:api": "sh ../../api_doc.sh ./src/app-sui.ts ./lib/app-sui.js",
+    "vectors:firmware:v2": "node ./scripts/generate-firmware-content-v2.js",
     "test:webusb": "npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/usb.js",
     "test:webble": "npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/ble.js",
     "test:virtual": "npx webpack serve --progress --config ../../webpack.config.js --output-path ./__tests__ --entry ./__tests__/virtual.js",
@@ -46,7 +47,6 @@
     "@secux/protocol-transaction": "^3.0.0",
     "@secux/utility": "^3.0.20",
     "base-x": "^3.0.8",
-    "blakejs": "^1.2.1",
     "secp256k1": "^4.0.2"
   },
   "peerDependencies": {

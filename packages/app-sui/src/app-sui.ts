@@ -18,9 +18,9 @@ limitations under the License.
 import "./polyfill";
 import { Ed25519PublicKey } from '@mysten/sui/keypairs/ed25519';
 import { Secp256k1PublicKey } from '@mysten/sui/keypairs/secp256k1';
-import { fromHex, toBase64 } from '@mysten/sui/utils';
+import { fromBase64, fromHex, normalizeStructTag, normalizeSuiAddress, toBase64 } from '@mysten/sui/utils';
 import { PublicKey, SignatureScheme, toSerializedSignature } from '@mysten/sui/cryptography';
-import { Transaction, TransactionObjectArgument } from '@mysten/sui/transactions';
+import { Transaction } from '@mysten/sui/transactions';
 import ow from "ow";
 import * as secp256k1 from "secp256k1";
 import { ITransport } from "@secux/transport";
@@ -35,14 +35,10 @@ import { SecuxTransactionTool } from "@secux/protocol-transaction";
 import { EllipticCurve, TransactionType } from "@secux/protocol-transaction/lib/interface";
 import {
   loadPlugin,
-  Logger,
 } from "@secux/utility";
-import { bcs } from '@mysten/sui/bcs';
-import { ow_nftData, ow_path, ow_publickey, ow_tokenData, ow_TransactionObject, ow_transferData, SuiCurve, TransactionObject, txDetail } from "./interface";
+import { ow_fungibleData, ow_nftData, ow_objectFungibleData, ow_path, ow_publickey, ow_TransactionObject, SuiCurve, TransactionObject, txDetail } from "./interface";
 
 export { SecuxSUI };
-const logger = Logger?.child({ id: "sui" });
-const coinTransferTarget = '0x2::transfer::public_transfer';
 
 /**
  * SUI package for SecuX device
@@ -111,108 +107,296 @@ class SecuxSUI {
    * @param {transferData} content transaction object
    * @returns {prepared} prepared object
    */
+  // static async prepareSign(
+  //   path: string,
+  //   content: txDetail
+  // ): Promise<{ commandData: communicationData; rawTx: communicationData }> {
+  //   ow(path, ow_path);
+  //   const curve = curveFromPath(path);
+  //   const tx = new Transaction();
+  //   tx.setSender(SecuxSUI.addressConvert(content.publickey, curve));
+  //   tx.setGasPrice(Number(content.gasPrice));
+  //   tx.setGasBudget(Number(content.gasBudget));
+
+  //   tx.setGasPayment(content.gasPayment.map(ref => ({
+  //     objectId: ref.objectId,
+  //     version: String(ref.version),
+  //     digest: ref.digest
+  //   })));
+
+  //   let transferObjects: TransactionObjectArgument[] = [];
+
+  //   if (content.tokens) {
+  //     ow(content, ow_tokenData);
+  //     // Send Custom Token: Merge objects if needed, then split
+  //     const primaryToken = tx.objectRef({
+  //       objectId: content.tokens[0].objectId,
+  //       version: String(content.tokens[0].version),
+  //       digest: content.tokens[0].digest
+  //     });
+
+  //     const tokensToMerge = content.tokens.slice(1).map(ref => tx.objectRef({
+  //       objectId: ref.objectId,
+  //       version: String(ref.version),
+  //       digest: ref.digest
+  //     }));
+  //     if (tokensToMerge.length > 0) {
+  //       tx.mergeCoins(primaryToken, tokensToMerge);
+  //     }
+
+  //     const [token] = tx.splitCoins(primaryToken,[tx.pure.u64(content.amount)]);
+  //     transferObjects = [token];
+  //     tx.moveCall({
+  //       target: coinTransferTarget,
+  //       typeArguments: [ content.type.startsWith('0x2::coin::Coin') ? content.type : `0x2::coin::Coin<${content.type}>` ],
+  //       arguments: [
+  //         token,
+  //         tx.pure.address(content.to)
+  //       ],
+  //     });
+  //   } else if (content.nfts) {
+  //     ow(content, ow_nftData);
+  //     // Send NFTs: Transfer all specified objects directly
+  //     transferObjects = content.nfts.map(ref => tx.objectRef({
+  //       objectId: ref.objectId,
+  //       version: String(ref.version),
+  //       digest: ref.digest
+  //     }));
+  //     tx.transferObjects(transferObjects, content.to);
+  //   } else {
+  //     ow(content, ow_transferData);
+  //     const [coin] = tx.splitCoins(tx.gas, [tx.pure.u64(content.amount!)]);
+  //     transferObjects = [coin];
+  //     tx.transferObjects(transferObjects, content.to);
+  //   }
+
+  //   const txBytes = await tx.build();
+
+  //   const intentMessage = new Uint8Array([0, 0, 0].length + txBytes.length);
+  //   intentMessage.set([0, 0, 0]);
+  //   intentMessage.set(txBytes, 3);
+
+  //   return wrapResult({
+  //     commandData: SecuxTransactionTool.signRawTransaction(
+  //       path,
+  //       Buffer.from(intentMessage),
+  //       {
+  //         tp: TransactionType.NORMAL,
+  //         curve: curve,
+  //         chainId: 0
+  //       }),
+  //     rawTx: toCommunicationData(Buffer.from(txBytes)),
+  //   });
+  // }
+
+  // static async prepareSign(
+  //   path: string,
+  //   content: txDetail
+  // ): Promise<{ commandData: communicationData; rawTx: communicationData }> {
+  //   ow(path, ow_path);
+  //   const curve = curveFromPath(path);
+  //   const tx = new Transaction();
+  //   tx.setSender(SecuxSUI.addressConvert(content.publickey, curve));
+  //   tx.setGasPrice(Number(content.gasPrice));
+  //   tx.setGasBudget(Number(content.gasBudget));
+
+  //   tx.setGasPayment(content.gasPayment.map(ref => ({
+  //     objectId: ref.objectId,
+  //     version: String(ref.version),
+  //     digest: ref.digest
+  //   })));
+
+  //   let transferObjects: TransactionObjectArgument[] = [];
+
+  //   if (content.tokens || content.withdrawAmount) {
+  //     // ===== 代幣轉帳 (支援 Objects + Address Balance 並存) =====
+  //     ow(content, ow_tokenData);
+
+  //     const coinType = content.type.startsWith('0x2::coin::Coin') 
+  //       ? content.type.replace('0x2::coin::Coin<', '').replace('>', '')
+  //       : content.type;
+
+  //     let primaryToken: TransactionObjectArgument | null = null;
+
+  //     // 1. 處理實體 Coin Objects (如果有)
+  //     if (content.tokens && content.tokens.length > 0) {
+  //       primaryToken = tx.objectRef({
+  //         objectId: content.tokens[0].objectId,
+  //         version: String(content.tokens[0].version),
+  //         digest: content.tokens[0].digest
+  //       });
+
+  //       const tokensToMerge = content.tokens.slice(1).map(ref => tx.objectRef({
+  //         objectId: ref.objectId,
+  //         version: String(ref.version),
+  //         digest: ref.digest
+  //       }));
+
+  //       if (tokensToMerge.length > 0) {
+  //         tx.mergeCoins(primaryToken, tokensToMerge);
+  //       }
+  //     }
+
+  //     // 2. 處理從 Address Balance 提領 (如果後端算出來 withdrawAmount > 0)
+  //     if (content.withdrawAmount && BigInt(content.withdrawAmount) > 0) {
+  //       const [withdrawnCoin] = tx.moveCall({
+  //         target: '0x2::balance::withdraw_funds',
+  //         typeArguments: [coinType],
+  //         arguments: [tx.pure.u64(content.withdrawAmount)],
+  //       });
+
+  //       if (primaryToken) {
+  //         // 如果原本就有實體 Coin，將提領出來的 Coin 併入 Primary Coin
+  //         tx.mergeCoins(primaryToken, [withdrawnCoin]);
+  //       } else {
+  //         // 如果原本完全沒有實體 Coin，提領出來的 Coin 就是 Primary Coin
+  //         primaryToken = withdrawnCoin;
+  //       }
+  //     }
+
+  //     if (!primaryToken) {
+  //       throw new Error("No token objects or balance available for transfer.");
+  //     }
+
+  //     // 3. 裁切（Split）出精確的金額進行轉帳
+  //     const [finalToken] = tx.splitCoins(primaryToken, [tx.pure.u64(content.amount)]);
+      
+  //     // 4. 執行轉帳
+  //     tx.moveCall({
+  //       target: coinTransferTarget,
+  //       typeArguments: [`0x2::coin::Coin<${coinType}>`],
+  //       arguments: [
+  //         finalToken,
+  //         tx.pure.address(content.to)
+  //       ],
+  //     });
+
+  //   } else if (content.nfts) {
+  //     ow(content, ow_nftData);
+  //     // Send NFTs: Transfer all specified objects directly
+  //     transferObjects = content.nfts.map(ref => tx.objectRef({
+  //       objectId: ref.objectId,
+  //       version: String(ref.version),
+  //       digest: ref.digest
+  //     }));
+  //     tx.transferObjects(transferObjects, content.to);
+  //   } else {
+  //     // SUI 原生幣轉帳
+  //     ow(content, ow_transferData);
+  //     const [coin] = tx.splitCoins(tx.gas, [tx.pure.u64(content.amount!)]);
+  //     transferObjects = [coin];
+  //     tx.transferObjects(transferObjects, content.to);
+  //   }
+
+  //   const txBytes = await tx.build();
+
+  //   const intentMessage = new Uint8Array([0, 0, 0].length + txBytes.length);
+  //   intentMessage.set([0, 0, 0]);
+  //   intentMessage.set(txBytes, 3);
+
+  //   return wrapResult({
+  //     commandData: SecuxTransactionTool.signRawTransaction(
+  //       path,
+  //       Buffer.from(intentMessage),
+  //       {
+  //         tp: TransactionType.NORMAL,
+  //         curve: curve,
+  //         chainId: 0
+  //       }),
+  //     rawTx: toCommunicationData(Buffer.from(txBytes)),
+  //   });
+  // }
   static async prepareSign(
       path: string,
       content: txDetail
   ): Promise<{ commandData: communicationData; rawTx: communicationData }> {
+      if (content.transactionKind) return this.prepareSignBalance(path, content);
+      if (content.nfts || content.tokens) return this.prepareSignObject(path, content);
+      return this.prepareSignAddress(path, content);
+  }
+
+  /** Build a transaction that explicitly consumes Coin/Object inputs. */
+  static async prepareSignObject(path: string, content: txDetail): Promise<{ commandData: communicationData; rawTx: communicationData }> {
       ow(path, ow_path);
+      if (content.transactionKind) throw new Error('ArgumentError: prepareSignObject does not accept transactionKind');
       const curve = curveFromPath(path);
-      
-      // 1. 初始化交易（完全離線，不引入 SuiClient）
-      const tx = new Transaction();
       const sender = SecuxSUI.addressConvert(content.publickey, curve);
-      
-      // 2. 設定發送者與離線 Gas 參數
-      tx.setSender(sender);
-      tx.setGasPrice(Number(content.gasPrice));
-      tx.setGasBudget(Number(content.gasBudget));
+      const tx = new Transaction();
+      applyOfflineTransactionData(tx, content, sender);
 
-      // 4. 根據交易類型構建 PTB
-      if (content.nfts && content.nfts.length > 0) {
-          // NFT 等不可分割實體 Object：維護傳統 transferObjects 邏輯
+      if (content.nfts?.length) {
           ow(content, ow_nftData);
-          const transferObjects = content.nfts.map(ref => tx.objectRef({
-              objectId: ref.objectId,
-              version: String(ref.version),
-              digest: ref.digest
-          }));
-          tx.transferObjects(transferObjects, content.to);
+          assertDistinctObjectRefs(content.nfts, content.gasPayment ?? []);
+          tx.transferObjects(content.nfts.map(ref => tx.objectRef(toObjectRef(ref))), content.to);
       } else {
-          // FT 代幣或 SUI 轉帳：使用 Address Balance 指令 (send_funds)
+          ow(content, ow_objectFungibleData);
           const coinType = getPureCoinType(content.type);
+          const amount = parseAmount(content.amount!);
 
-          const withdrawalInput = tx.withdrawal({
-              amount: BigInt(content.amount!),
-              type: coinType
-          });
-
-          // 兌換提款憑證為 Balance
-          const [extractedBalance] = tx.moveCall({
-              target: '0x2::balance::redeem_funds',
-              typeArguments: [coinType],
-              arguments: [withdrawalInput]
-          });
-
-          // 呼叫 sui::balance::send_funds 轉給目標地址
-          tx.moveCall({
-              target: '0x2::balance::send_funds',
-              typeArguments: [coinType],
-              arguments: [
-                  extractedBalance,
-                  tx.pure.address(content.to),
-              ],
-          });
+          if (normalizeStructTag(coinType) === normalizeStructTag('0x2::sui::SUI')) {
+              if (!content.gasPayment?.length) throw new Error('ArgumentError: SUI object transfer requires gasPayment');
+              const [coin] = tx.splitCoins(tx.gas, [tx.pure.u64(amount)]);
+              tx.transferObjects([coin], content.to);
+          } else {
+              if (!content.tokens?.length) throw new Error('ArgumentError: token object transfer requires tokens');
+              assertDistinctObjectRefs(content.tokens, content.gasPayment ?? []);
+              const coinObjects = content.tokens.map(ref => tx.objectRef(toObjectRef(ref)));
+              const [primary, ...rest] = coinObjects;
+              if (rest.length) tx.mergeCoins(primary, rest);
+              const [coin] = tx.splitCoins(primary, [tx.pure.u64(amount)]);
+              tx.transferObjects([coin], content.to);
+          }
       }
 
-      let txBytes;
-      if (content.gasPayment && content.gasPayment.length > 0) {
-          tx.setGasPayment(content.gasPayment.map(ref => ({
-              objectId: ref.objectId,
-              version: String(ref.version),
-              digest: ref.digest
-          })));
-          txBytes = await tx.build();
-      } else {
-        const kindBytes = await tx.build({ onlyTransactionKind: true });
+      return prepareTransactionForDevice(path, curve, tx);
+  }
 
-        // 步驟 B-2: 離線手動組裝包含空 payment 的完整 TransactionData
-        const transactionData = {
-            V1: {
-                kind: bcs.TransactionKind.parse(kindBytes),
-                sender: sender,
-                gasData: {
-                    payment: [], // 👈 明確告訴鏈：用 Address Balance 扣除 Gas！
-                    owner: sender,
-                    price: BigInt(content.gasPrice),
-                    budget: BigInt(content.gasBudget),
-                },
-                expiration: { None: true },
-            },
-        };
+  /** Build a transaction funded strictly from the sender's address balance. */
+  static async prepareSignAddress(path: string, content: txDetail): Promise<{ commandData: communicationData; rawTx: communicationData }> {
+      ow(path, ow_path);
+      ow(content, ow_fungibleData);
+      if (content.transactionKind) throw new Error('ArgumentError: prepareSignAddress does not accept transactionKind');
+      if (content.tokens || content.nfts) throw new Error('ArgumentError: prepareSignAddress does not accept object inputs');
 
-        // 步驟 B-3: 使用 BCS 直接序列化出完整的 txBytes (完全不需要 Client)
-        txBytes = bcs.TransactionData.serialize(transactionData).toBytes();;
-      }
+      const curve = curveFromPath(path);
+      const sender = SecuxSUI.addressConvert(content.publickey, curve);
+      const tx = new Transaction();
+      applyOfflineTransactionData(tx, content, sender, true);
 
-      // 5. 離線序列化交易字節 (build 時不帶入 client 參數)
-
-      // 6. 打包 Sui Intent Message (0, 0, 0) 並傳給 SecuX 硬體簽章工具
-      const intentMessage = new Uint8Array(3 + txBytes.length);
-      intentMessage.set([0, 0, 0], 0);
-      intentMessage.set(txBytes, 3);
-
-      return wrapResult({
-          commandData: SecuxTransactionTool.signRawTransaction(
-              path,
-              Buffer.from(intentMessage),
-              {
-                  tp: TransactionType.NORMAL,
-                  curve: curve,
-                  chainId: 0
-              }
-          ),
-          rawTx: toCommunicationData(Buffer.from(txBytes)),
+      const coinType = getPureCoinType(content.type);
+      const withdrawal = tx.withdrawal({ amount: parseAmount(content.amount!), type: coinType });
+      const [balance] = tx.moveCall({
+          target: '0x2::balance::redeem_funds',
+          typeArguments: [coinType],
+          arguments: [withdrawal],
       });
+      tx.moveCall({
+          target: '0x2::balance::send_funds',
+          typeArguments: [coinType],
+          arguments: [balance, tx.pure.address(content.to)],
+      });
+
+      return prepareTransactionForDevice(path, curve, tx);
+  }
+
+  /** Sign an official tx.balance() result after enforcing a strict transfer policy. */
+  static async prepareSignBalance(path: string, content: txDetail): Promise<{ commandData: communicationData; rawTx: communicationData }> {
+      ow(path, ow_path);
+      ow(content, ow_fungibleData);
+      if (!content.transactionKind) throw new Error('ArgumentError: prepareSignBalance requires transactionKind');
+
+      const curve = curveFromPath(path);
+      const sender = SecuxSUI.addressConvert(content.publickey, curve);
+      const tx = Transaction.fromKind(getBuffer(content.transactionKind));
+      validateBalanceTransactionKind(tx, {
+          sender,
+          to: content.to,
+          amount: parseAmount(content.amount!),
+          coinType: getPureCoinType(content.type),
+      });
+      applyOfflineTransactionData(tx, content, sender);
+
+      return prepareTransactionForDevice(path, curve, tx);
   }
 
   /**
@@ -311,6 +495,189 @@ class SecuxSUI {
 
 loadPlugin(SecuxSUI, "SecuxSUI");
 
+function toObjectRef(ref: { objectId: string; version: number | string; digest: string }) {
+  return { objectId: ref.objectId, version: String(ref.version), digest: ref.digest };
+}
+
+function assertDistinctObjectRefs(
+  transactionObjects: Array<{ objectId: string }>,
+  gasObjects: Array<{ objectId: string }>,
+) {
+  const transactionIds = transactionObjects.map(ref => normalizeSuiAddress(ref.objectId));
+  if (new Set(transactionIds).size !== transactionIds.length) {
+    throw new Error('ArgumentError: duplicate transaction object');
+  }
+  const gasIds = new Set(gasObjects.map(ref => normalizeSuiAddress(ref.objectId)));
+  if (transactionIds.some(id => gasIds.has(id))) {
+    throw new Error('ArgumentError: gasPayment must not overlap transaction objects');
+  }
+}
+
+function applyOfflineTransactionData(tx: Transaction, content: txDetail, sender: string, allowImplicitAddressGas = false) {
+  tx.setSender(sender);
+  tx.setGasOwner(content.gasOwner ?? sender);
+  tx.setGasPrice(content.gasPrice);
+  tx.setGasBudget(content.gasBudget);
+
+  if (content.gasPayment === undefined && !allowImplicitAddressGas) {
+    throw new Error('ArgumentError: offline signing requires gasPayment (use [] for address-balance gas)');
+  }
+  const gasPayment = content.gasPayment ?? [];
+  tx.setGasPayment(gasPayment.map(toObjectRef));
+
+  if (content.expiration) {
+    tx.setExpiration(content.expiration);
+  } else if (content.nonce !== undefined) {
+    tx.setExpiration({ Epoch: content.nonce });
+  } else if (gasPayment.length === 0) {
+    throw new Error('ArgumentError: address-balance gas requires expiration');
+  }
+}
+
+async function prepareTransactionForDevice(
+  path: string,
+  curve: SuiCurve,
+  tx: Transaction,
+): Promise<{ commandData: communicationData; rawTx: communicationData }> {
+  const txBytes = await tx.build();
+  const intentMessage = new Uint8Array(3 + txBytes.length);
+  intentMessage.set([0, 0, 0], 0);
+  intentMessage.set(txBytes, 3);
+
+  return wrapResult({
+    commandData: SecuxTransactionTool.signRawTransaction(path, Buffer.from(intentMessage), {
+      tp: TransactionType.NORMAL,
+      curve,
+      chainId: 0,
+    }),
+    rawTx: toCommunicationData(Buffer.from(txBytes)),
+  });
+}
+
+type BalancePolicy = { sender: string; to: string; amount: bigint; coinType: string };
+
+function validateBalanceTransactionKind(tx: Transaction, policy: BalancePolicy) {
+  const data: any = tx.getData();
+  const inputs: any[] = data.inputs;
+  const commands: any[] = data.commands;
+  const coinType = normalizeStructTag(policy.coinType);
+  const sender = normalizeSuiAddress(policy.sender);
+
+  if (inputs.length > 64 || commands.length === 0 || commands.length > 64) {
+    throw new Error('SecurityError: unsupported balance transaction size');
+  }
+
+  for (const input of inputs) {
+    if (input.$kind === 'Pure') continue;
+    if (input.$kind === 'Object' && input.Object?.$kind === 'ImmOrOwnedObject') continue;
+    if (input.$kind === 'FundsWithdrawal') {
+      const withdrawal = input.FundsWithdrawal;
+      if (withdrawal.withdrawFrom?.$kind !== 'Sender') {
+        throw new Error('SecurityError: only sender balance withdrawals are allowed');
+      }
+      if (normalizeStructTag(withdrawal.typeArg?.Balance) !== coinType) {
+        throw new Error('SecurityError: withdrawal coin type mismatch');
+      }
+      continue;
+    }
+    throw new Error(`SecurityError: unsupported balance input ${input.$kind}`);
+  }
+
+  let recipientSendIndex = -1;
+  for (let index = 0; index < commands.length; index++) {
+    const command = commands[index];
+    if (command.$kind === 'MergeCoins' || command.$kind === 'SplitCoins') continue;
+    if (command.$kind !== 'MoveCall') {
+      throw new Error(`SecurityError: unsupported balance command ${command.$kind}`);
+    }
+
+    const call = command.MoveCall;
+    if (normalizeSuiAddress(call.package) !== normalizeSuiAddress('0x2')) {
+      throw new Error('SecurityError: custom Move packages are not allowed');
+    }
+    const target = `${call.module}::${call.function}`;
+    const allowed = new Set([
+      'balance::redeem_funds',
+      'balance::send_funds',
+      'coin::redeem_funds',
+      'coin::into_balance',
+      'coin::send_funds',
+    ]);
+    if (!allowed.has(target)) throw new Error(`SecurityError: Move call ${target} is not allowed`);
+    if (call.typeArguments.length !== 1 || normalizeStructTag(call.typeArguments[0]) !== coinType) {
+      throw new Error('SecurityError: Move call coin type mismatch');
+    }
+
+    if (target === 'balance::send_funds') {
+      if (recipientSendIndex !== -1) throw new Error('SecurityError: multiple recipient transfers are not allowed');
+      assertAddressArgument(inputs, call.arguments[1], policy.to);
+      assertExactBalanceAmount(inputs, commands, call.arguments[0], policy.amount);
+      recipientSendIndex = index;
+    } else if (target === 'coin::send_funds') {
+      // The resolver may return change, but only to the signer.
+      assertAddressArgument(inputs, call.arguments[1], sender);
+    }
+  }
+
+  if (recipientSendIndex === -1 || recipientSendIndex !== commands.length - 1) {
+    throw new Error('SecurityError: balance::send_funds must be the final command');
+  }
+}
+
+function assertAddressArgument(inputs: any[], argument: any, expected: string) {
+  if (argument?.$kind !== 'Input') throw new Error('SecurityError: recipient must be a pure input');
+  const input = inputs[argument.Input];
+  if (input?.$kind !== 'Pure') throw new Error('SecurityError: recipient must be a pure address');
+  const bytes = fromBase64(input.Pure.bytes);
+  if (bytes.length !== 32 || normalizeSuiAddress(`0x${Buffer.from(bytes).toString('hex')}`) !== normalizeSuiAddress(expected)) {
+    throw new Error('SecurityError: recipient address mismatch');
+  }
+}
+
+function assertExactBalanceAmount(inputs: any[], commands: any[], argument: any, expected: bigint) {
+  if (argument?.$kind !== 'NestedResult' && argument?.$kind !== 'Result') {
+    throw new Error('SecurityError: unsupported balance source');
+  }
+  const commandIndex = argument.$kind === 'NestedResult' ? argument.NestedResult[0] : argument.Result;
+  const resultIndex = argument.$kind === 'NestedResult' ? argument.NestedResult[1] : 0;
+  const command = commands[commandIndex];
+
+  if (command?.$kind === 'SplitCoins') {
+    const amountArg = command.SplitCoins.amounts[resultIndex];
+    if (readPureU64(inputs, amountArg) !== expected) throw new Error('SecurityError: transfer amount mismatch');
+    return;
+  }
+  if (command?.$kind !== 'MoveCall') throw new Error('SecurityError: unsupported balance source command');
+
+  const call = command.MoveCall;
+  const target = `${call.module}::${call.function}`;
+  if (target === 'balance::redeem_funds' || target === 'coin::redeem_funds') {
+    const withdrawalArg = call.arguments[0];
+    if (withdrawalArg?.$kind !== 'Input') throw new Error('SecurityError: invalid withdrawal argument');
+    const withdrawal = inputs[withdrawalArg.Input]?.FundsWithdrawal;
+    if (!withdrawal || BigInt(withdrawal.reservation?.MaxAmountU64) !== expected) {
+      throw new Error('SecurityError: transfer amount mismatch');
+    }
+    return;
+  }
+  if (target === 'coin::into_balance') {
+    assertExactBalanceAmount(inputs, commands, call.arguments[0], expected);
+    return;
+  }
+  throw new Error(`SecurityError: unsupported balance source ${target}`);
+}
+
+function readPureU64(inputs: any[], argument: any): bigint {
+  if (argument?.$kind !== 'Input') throw new Error('SecurityError: amount must be a pure input');
+  const input = inputs[argument.Input];
+  if (input?.$kind !== 'Pure') throw new Error('SecurityError: amount must be a pure u64');
+  const bytes = fromBase64(input.Pure.bytes);
+  if (bytes.length !== 8) throw new Error('SecurityError: amount must be a pure u64');
+  let value = BigInt(0);
+  for (let i = 7; i >= 0; i--) value = (value << BigInt(8)) | BigInt(bytes[i]);
+  return value;
+}
+
 function convertToUin8Array(data: string | Buffer) {
   if (typeof data === "string") {
     // fromHex 會自動處理 0x 前綴
@@ -366,6 +733,35 @@ function getPureCoinType(rawType: string | undefined): string {
     return match ? match[1] : rawType;
 }
 
+function parseAmount(value: number | string): bigint {
+    let amount: bigint;
+
+    if (typeof value === "number") {
+        if (!Number.isSafeInteger(value)) {
+            throw new Error(`ArgumentError: amount must be a safe integer, got ${value}`);
+        }
+        amount = BigInt(value);
+    } else {
+        const normalized = value.trim();
+
+        if (/^0x[0-9a-f]+$/i.test(normalized)) {
+            amount = BigInt(normalized);
+        } else if (/^[0-9]+$/.test(normalized)) {
+            amount = BigInt(normalized);
+        } else if (/^(?=.*[a-f])[0-9a-f]+$/i.test(normalized)) {
+            amount = BigInt(`0x${normalized}`);
+        } else {
+            throw new Error(`ArgumentError: unsupported amount format, got ${value}`);
+        }
+    }
+
+    if (amount <= BigInt(0) || amount > BigInt("18446744073709551615")) {
+        throw new Error(`ArgumentError: amount must be between 1 and 18446744073709551615, got ${value}`);
+    }
+
+    return amount;
+}
+
 /**
  * Data type for transmission.
  * @typedef {string|Buffer} communicationData
@@ -390,4 +786,3 @@ function getPureCoinType(rawType: string | undefined): string {
  * @property {communicationData} commandData data for sending to device
  * @property {communicationData} rawTx unsigned raw transaction
  */
-

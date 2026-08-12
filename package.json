@@ -9,6 +9,10 @@
     "packages/!(sdk)/**"
   ],
   "scripts": {
+    "clean": "node ./scripts/clean.js",
+    "clean:all": "node ./scripts/clean.js --all",
+    "clean:modules": "node ./scripts/clean.js --modules",
+    "clean:dry-run": "node ./scripts/clean.js --all --dry-run",
     "test:webusb": "npx webpack serve --progress --config ./webpack.config.js --output-path ./__tests__ --entry ./__tests__/usb.js --port 8081",
     "test:webble": "npx webpack serve --progress --config ./webpack.config.js --output-path ./__tests__ --entry ./__tests__/ble.js --port 8081",
     "test:virtual": "npx webpack serve --progress --config ./webpack.config.js --output-path ./__tests__ --entry ./__tests__/virtual.js --port 8081",
@@ -17,7 +21,8 @@
     "bump": "lerna publish from-package",
     "version": "lerna version --no-git-tag-version",
     "bootstrap": "lerna run tsc && lerna bootstrap",
-    "watch": "lerna run watch"
+    "watch": "lerna run watch",
+    "sui:donor": "node ./scripts/sui-donor/donor.mjs"
   },
   "devDependencies": {
     "@secux/app-bnb": "file:packages/app-bnb",

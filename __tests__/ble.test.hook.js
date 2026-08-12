@@ -7,7 +7,7 @@ document.getElementById("connect").onclick = async () => {
     webble = await SecuxWebBLE.Create(
         () => console.log('connected'),
         () => console.log('disconnected'),
-        ["crypto", "nifty"]
+        ["crypto", "nifty", "shield"]
     );
     await webble.Connect();
 

@@ -8,7 +8,7 @@ const definePluginConfig = new webpack.DefinePlugin({
 });
 
 const nodepolyfillPlugin = new webpack.ProvidePlugin({
-    process: 'process/browser',
+    process: require.resolve('process/browser.js'),
     Buffer: ['buffer', 'Buffer'],
 });
 
@@ -33,6 +33,12 @@ module.exports = {
                 test: /\.ts$/,
                 use: 'ts-loader',
                 exclude: /node_modules/
+            },
+            {
+                test: /\.m?js$/,
+                resolve: {
+                    fullySpecified: false
+                }
             }
         ]
     },
@@ -43,7 +49,7 @@ module.exports = {
         extensions: ['.ts', '.js'],
         fallback: {
             buffer: require.resolve('buffer/'),
-            process: require.resolve('process'),
+            process: require.resolve('process/browser.js'),
             crypto: require.resolve('crypto-browserify'),
             stream: require.resolve('stream-browserify'),
             vm: require.resolve('vm-browserify'),
