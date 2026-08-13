@@ -1,6 +1,6 @@
 {
   "name": "@secux/protocol-device",
-  "version": "3.6.2",
+  "version": "3.6.3",
   "description": "SecuX Hardware Wallet device protocol API",
   "keywords": [
     "secux",
@@ -23,7 +23,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "sh ../../build.sh",
+    "build": "sh ../../build.sh && npm run build:dfu",
     "build:dfu": "../../node_modules/.bin/webpack --config ./webpack.dfu.config.js",
     "docs": "npx tsc && jsdoc2md --template ./README.hbs ./lib/protocol-device.js > README.md",
     "doc:api": "sh ../../api_doc.sh ./src/protocol-device.ts ./lib/protocol-device.js",
