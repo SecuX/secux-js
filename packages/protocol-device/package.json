@@ -1,6 +1,6 @@
 {
   "name": "@secux/protocol-device",
-  "version": "3.6.2",
+  "version": "3.6.3",
   "description": "SecuX Hardware Wallet device protocol API",
   "keywords": [
     "secux",
@@ -23,7 +23,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "sh ../../build.sh && npx webpack --config ./webpack.dfu.config.js",
+    "build": "sh ../../build.sh && npm run build:dfu",
+    "build:dfu": "../../node_modules/.bin/webpack --config ./webpack.dfu.config.js",
     "docs": "npx tsc && jsdoc2md --template ./README.hbs ./lib/protocol-device.js > README.md",
     "doc:api": "sh ../../api_doc.sh ./src/protocol-device.ts ./lib/protocol-device.js",
     "test:webusb": "npx webpack serve --progress --config ./webpack.config.js --output-path ./__tests__",
@@ -38,10 +39,23 @@
   },
   "devDependencies": {
     "@secux/transport": "file:../transport",
-    "@secux/transport-webusb": "file:../transport-webusb",
     "crc-32": "^1.2.0",
     "jszip-sync": "^3.2.1-sync",
+    "react-native": "0.73.0",
+    "react-native-ble-plx": "^2.0.2",
     "threads": "^1.7.0",
     "threads-plugin": "^1.4.0"
+  },
+  "peerDependencies": {
+    "react-native": "^0.73.0",
+    "react-native-ble-plx": "^2.0.2"
+  },
+  "peerDependenciesMeta": {
+    "react-native": {
+      "optional": true
+    },
+    "react-native-ble-plx": {
+      "optional": true
+    }
   }
 }

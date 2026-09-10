@@ -50,7 +50,8 @@ export function privateAdd(key: string | Uint8Array, tweak: string | Uint8Array)
 }
 
 export function privateNegate(key: string | Uint8Array): Buffer {
-    const normal = Crypto.secp256k1.utils.normPrivateKeyToScalar;
+    const normal = Crypto.secp256k1.utils.normPrivateKeyToScalar as
+        (key: string | Uint8Array) => bigint;
     const neg = mod(-normal(key), Crypto.secp256k1.CURVE.n);
 
     return Buffer.from(numberToBytesBE(neg, 32));

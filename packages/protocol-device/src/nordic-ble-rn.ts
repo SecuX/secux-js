@@ -18,13 +18,13 @@ limitations under the License.
 
 import { ITransport } from "@secux/transport";
 import { ITransportNordic } from "./interface";
-import { DeviceCallback } from "@secux/transport-reactnative";
 import { DeviceType } from "@secux/transport/lib/interface";
 import { Platform } from "react-native";
 import {
     BleManager, Device, BleError, Characteristic, State, ScanCallbackType, ScanMode
 } from "react-native-ble-plx";
 
+type DeviceCallback = (device: Device) => void;
 
 const SERVICE_UUID = "0000fe59-0000-1000-8000-00805f9b34fb";
 const CONTROL_UUID = "8ec90001-f315-4f60-9fb8-838830daea50";

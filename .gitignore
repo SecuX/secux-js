@@ -8,3 +8,11 @@ lerna-error.log
 yarn-error.log
 *.swp
 package-lock.json
+scripts/sui-donor/.env
+tmp.ts
+/tmp/*
+packages/**/tmp
+packages/**/__tests__/index.js
+packages/**/dist-debug/
+packages/**/__tests__/firmware-content-v2
+packages/**/__tests__/sui-firmware-content-v2.zip

@@ -1,35 +1,53 @@
 #!/bin/sh
 
-rm -r ./lib
+set -eu
 
 DIR=$(pwd)
 SRC=$(basename "$DIR").ts
+BIN=../../node_modules/.bin
+WEBPACK=$BIN/webpack
+TSC=$BIN/tsc
+MINIFY=../../scripts/minify-lib.js
 
-if [[ $SRC =~ ^app- || $SRC =~ ^transport- ]] 
-then
-    SRC=./src/$SRC
-    mv $SRC tmp.ts
-    sed '/^@staticImplements<IPlugin>()/d' tmp.ts > $SRC
-    
-    if [[ -f "./webpack.config.js" ]]
-    then
-        rm -r ./dist
-        npx webpack
-        for i in {1..2}; do
-            sed -i '' -e 's/\([^0-9a-zA-Z_]\)self\([^0-9a-zA-Z]\)/\1this\2/g' ./dist/*.js
-        done
+ORIGINAL_SOURCE=
+restore_source() {
+    if [ -n "$ORIGINAL_SOURCE" ] && [ -f ./tmp.ts ]; then
+        mv ./tmp.ts "$ORIGINAL_SOURCE"
     fi
+}
+trap restore_source EXIT HUP INT TERM
 
-    npx tsc
-    mv tmp.ts $SRC
-else
-    npx tsc
+if [ -d ./lib ]; then
+    rm -r ./lib
 fi
 
-mkdir ./tmp
-mv ./lib/*.js ./tmp
-for f in ./tmp/*.js
-do
-    npx terser -c --ecma 2017 --toplevel -o "./lib/$(basename $f)" $f
-done
-rm -r ./tmp
+case "$SRC" in
+    app-*|transport-*)
+        SRC=./src/$SRC
+        ORIGINAL_SOURCE=$SRC
+        mv "$SRC" ./tmp.ts
+        sed '/^@staticImplements<IPlugin>()/d' ./tmp.ts > "$SRC"
+
+        if [ -f ./webpack.config.js ]; then
+            if [ -d ./dist ]; then
+                rm -r ./dist
+            fi
+            "$WEBPACK"
+            for iteration in 1 2; do
+                for bundle in ./dist/*.js; do
+                    sed -e 's/\([^0-9a-zA-Z_]\)self\([^0-9a-zA-Z]\)/\1this\2/g' "$bundle" > "$bundle.tmp"
+                    mv "$bundle.tmp" "$bundle"
+                done
+            done
+        fi
+
+        "$TSC"
+        restore_source
+        ORIGINAL_SOURCE=
+        ;;
+    *)
+        "$TSC"
+        ;;
+esac
+
+node "$MINIFY" ./lib

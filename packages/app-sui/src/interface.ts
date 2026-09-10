@@ -61,10 +61,28 @@ export type suiObjectRef = {
   digest: string;
 };
 
+export type suiTransactionExpiration =
+  | { None: true }
+  | { Epoch: number | string }
+  | {
+      ValidDuring: {
+        minEpoch: number | string | null;
+        maxEpoch: number | string | null;
+        minTimestamp: number | string | null;
+        maxTimestamp: number | string | null;
+        chain: string;
+        nonce: number;
+      };
+    };
+
 export type txDetail = {
   gasPrice: number | string,
   gasBudget: number | string,
-  gasPayment: suiObjectRef[],
+  gasPayment?: suiObjectRef[],
+  gasOwner?: string,
+  /** BCS TransactionKind resolved by an online @mysten/sui client. */
+  transactionKind?: communicationData,
+  expiration?: suiTransactionExpiration,
   to: string,
   publickey: string,
   curve?: number,
@@ -72,10 +90,11 @@ export type txDetail = {
   type?: string,
   tokens?: suiObjectRef[],
   nfts?: suiObjectRef[],
+  nonce?: string
 };
 
 const price = ow.any(ow.number.uint32.positive, owTool.numberString);
-const amount = ow.any(ow.number.uint32.positive, owTool.numberString);
+const amount = ow.any(ow.number, ow.string);
 
 const ow_suiObjectRef = ow.object.exactShape({
   objectId: ow_objectId,
@@ -86,10 +105,15 @@ const ow_suiObjectRef = ow.object.exactShape({
 const base_Data_shape = {
   gasPrice: price,
   gasBudget: amount,
-  gasPayment: ow.array.ofType(ow_suiObjectRef).nonEmpty,
+  gasPayment: ow.any(ow.undefined, ow.array.ofType(ow_suiObjectRef)),
+  gasOwner: ow.any(ow.undefined, ow_address),
+  transactionKind: ow.any(ow.undefined, ow_communicationData),
+  expiration: ow.any(ow.undefined, ow.object),
   to: ow_address,
   publickey: ow_publickey,
   curve: ow.any(ow.undefined, ow_EllipticCurve),
+  nonce: ow.any(ow.undefined, ow.string),
+  tokens: ow.any(ow.undefined, ow.array.ofType(ow_suiObjectRef).nonEmpty),
 };
 
 export const ow_base_Data = ow.object.exactShape(base_Data_shape);
@@ -99,12 +123,13 @@ export const ow_transferData = ow.object.exactShape({
   amount: amount,
 });
 
-export const ow_tokenData = ow.object.exactShape({
+export const ow_fungibleData = ow.object.exactShape({
   ...base_Data_shape,
   amount: amount,
-  type: ow_type,
-  tokens: ow.array.ofType(ow_suiObjectRef).nonEmpty,
+  type: ow.any(ow.undefined, ow_type),
 });
+
+export const ow_objectFungibleData = ow_fungibleData;
 
 export const ow_nftData = ow.object.exactShape({
   ...base_Data_shape,
